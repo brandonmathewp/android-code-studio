@@ -100,6 +100,8 @@ For translations, visit the [Crowdin project page](https://crowdin.com/project/a
   for [AndroidTreeView](https://github.com/bmelnychuk/AndroidTreeView)
 - [George Fraser](https://github.com/georgewfraser) for
   the [Java Language Server](https://github.com/georgewfraser/java-language-server)
+- [FWCD](https://github.com/fwcd) for
+  the [Kotlin Language Server](https://github.com/fwcd/kotlin-language-server)
 - [Itsaky](https://github.com/itsaky) The original developer
   of [AndroidIDE](https://github.com/AndroidIDEOfficial/AndroidIDE.git) whose project I forked and now maintain.
   
