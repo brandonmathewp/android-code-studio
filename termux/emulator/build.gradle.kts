@@ -27,9 +27,6 @@ android {
     namespace = "com.termux.emulator"
     packaging.jniLibs.useLegacyPackaging = true
     
-    ndkPath = "/data/data/com.termux/files/home/Android/android-ndk-r27b"
-    ndkVersion = "27.1.12297006"
-    
     defaultConfig {
         externalNativeBuild {
             ndkBuild {
