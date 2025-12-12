@@ -573,4 +573,6 @@
   <string name="msg_terminal_new_sessions_disabled">لا يمكن إنشاء جلسة. الجلسات الجديدة معطلة!</string>
   <string name="title_install_location_error">خطأ في موقع التثبيت</string>
   <string name="title_unsupported_user">مستخدم غير مدعوم</string>
+
+  <!-- Additional Missing Strings (Part 2) -->
 </resources>
