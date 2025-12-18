@@ -16,7 +16,7 @@
  */
 package com.tom.rv2ide.fragments.sidebar.utils
 
-/*
+/* !! DEPRECATED 
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
  */
 

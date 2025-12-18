@@ -35,7 +35,7 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.textview.MaterialTextView
 import org.slf4j.LoggerFactory
 
-/*
+/* !! DEPRECATED 
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
  *
  * Renders live streaming AI responses with proper code boxes

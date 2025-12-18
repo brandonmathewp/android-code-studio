@@ -26,7 +26,7 @@ import com.tom.rv2ide.utils.ProjectHelper
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 
-/*
+/* !! DEPRECATED 
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
  */
 enum class ResponseMode {

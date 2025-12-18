@@ -20,7 +20,7 @@ package com.tom.rv2ide.fragments.sidebar.utils
 import android.content.Context
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
-/*
+/* // DEPRECATED 
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
  */
 

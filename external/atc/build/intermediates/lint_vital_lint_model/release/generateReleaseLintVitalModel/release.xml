@@ -28,6 +28,6 @@
       applicationId="com.tom.androidcodestudio.atc"
       generatedSourceFolders="build/generated/ap_generated_sources/release/out:build/generated/data_binding_base_class_source_out/release/out"
       generatedResourceFolders="build/generated/res/resValues/release"
-      desugaredMethodsFiles="/data/data/com.termux/files/home/.gradle/caches/8.13/transforms/1567b495a3584bd107220a37b0190f30/transformed/desugar_jdk_libs_configuration-2.1.5-desugar-lint.txt:/data/data/com.termux/files/home/.gradle/caches/8.13/transforms/126ac64f1c42b801a509ceeb21cd4e1f/transformed/D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="/data/data/com.termux/files/home/.gradle/caches/8.13/transforms/38c1681c1993fa385d74a30872fd3124/transformed/desugar_jdk_libs_configuration-2.1.5-desugar-lint.txt:/data/data/com.termux/files/home/.gradle/caches/8.13/transforms/7767f8ccf96372e1f880c1dbe563d332/transformed/D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>
