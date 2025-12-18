@@ -19,6 +19,7 @@
   <uses-permission
     android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
     tools:ignore="ScopedStorage" />
+  <uses-permission android:name="android.permission.READ_LOGS" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
@@ -31,8 +32,7 @@
     android:enableOnBackInvokedCallback="true"
     android:extractNativeLibs="true"
     android:hardwareAccelerated="true"
-    android:icon="@mipmap/ic_launcher"
-    android:roundIcon="@mipmap/ic_launcher"
+    android:icon="@drawable/ic_acside"
     android:label="@string/app_name"
     android:largeHeap="true"
     android:name=".app.IDEApplication"
@@ -41,6 +41,7 @@
     android:resizeableActivity="false"
     android:supportsRtl="true"
     android:theme="@style/Theme.AndroidIDE"
+    android:networkSecurityConfig="@xml/network_security_config"
     tools:ignore="DiscouragedApi,MediaCapabilities,UnusedAttribute">
     <activity
       android:exported="true"
@@ -76,6 +77,7 @@
     <activity android:name=".activities.AboutActivity" />
     <activity android:name=".activities.ContributorsActivity" />
     <activity android:name=".activities.IDEConfigurations" />
+    <activity android:name=".activities.ActivityM3Icons" />
 
     <activity
       android:name=".activities.TerminalActivity"
@@ -93,6 +95,16 @@
 
     <activity
       android:name=".activities.FolderPickerActivity"
+      android:exported="false"
+      android:theme="@style/Theme.AndroidIDE" />
+
+    <activity
+      android:name=".activities.FileBrowserActivity"
+      android:exported="false"
+      android:theme="@style/Theme.AndroidIDE" />
+
+    <activity
+      android:name=".activities.NCrashHandlerActivity"
       android:exported="false"
       android:theme="@style/Theme.AndroidIDE" />
 
@@ -142,13 +154,26 @@
       android:name=".services.builder.GradleBuildService" />
 
     <service
-      android:exported="true"
-      android:name=".services.log.LogReceiverService"
-      android:permission="com.tom.rv2ide.permission.BIND_LOG_SERVICE">
-      <intent-filter>
-        <action android:name="com.tom.rv2ide.LOG_SERVICE_ACTION" />
-      </intent-filter>
+      android:name="com.termux.app.TermuxService"
+      android:enabled="true"
+      android:exported="false"
+      android:stopWithTask="true" />
+
+    <service
+      android:name="io.github.mohammedbaqernull.logger.service.LogReceiverService"
+      android:enabled="true"
+      android:exported="true">
     </service>
+
+    <!-- <service -->
+    <!-- android:exported="true" -->
+    <!-- android:name=".services.log.LogReceiverService" -->
+    <!-- android:permission="com.tom.rv2ide.permission.BIND_LOG_SERVICE"> -->
+    <!-- <intent-filter> -->
+    <!-- <action android:name="com.tom.rv2ide.LOG_SERVICE_ACTION" /> -->
+    <!-- </intent-filter> -->
+    <!-- </service> -->
+
     <service
       android:enabled="false"
       android:exported="false"

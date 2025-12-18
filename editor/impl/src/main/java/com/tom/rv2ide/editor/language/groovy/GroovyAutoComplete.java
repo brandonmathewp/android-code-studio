@@ -187,6 +187,7 @@ public class GroovyAutoComplete {
     configs.add("default");
     configs.add("implementation");
     configs.add("implementation platform()");
+    configs.add("implementation files()");
     configs.add("lintChecks");
     configs.add("lintClassPath");
     configs.add("lintPublish");

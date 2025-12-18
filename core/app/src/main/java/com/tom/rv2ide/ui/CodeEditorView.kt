@@ -1,28 +1,11 @@
-/*
- *  This file is part of AndroidIDE.
- *
- *  AndroidIDE is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  AndroidIDE is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *   along with AndroidIDE.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 package com.tom.rv2ide.ui
 
-// import com.tom.rv2ide.lsp.clang.ClangLanguageServer || planned for v..03
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.widget.FrameLayout
 import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.core.view.isVisible
 import com.blankj.utilcode.util.SizeUtils
@@ -48,6 +31,7 @@ import com.tom.rv2ide.lsp.api.ILanguageServer
 import com.tom.rv2ide.lsp.api.ILanguageServerRegistry
 import com.tom.rv2ide.lsp.java.JavaLanguageServer
 import com.tom.rv2ide.lsp.kotlin.KotlinLanguageServer
+import com.tom.rv2ide.lsp.clang.ClangLanguageServer
 import com.tom.rv2ide.lsp.models.DiagnosticResult
 import com.tom.rv2ide.lsp.xml.XMLLanguageServer
 import com.tom.rv2ide.models.Range
@@ -56,6 +40,7 @@ import com.tom.rv2ide.syntax.colorschemes.SchemeAndroidIDE
 import com.tom.rv2ide.tasks.cancelIfActive
 import com.tom.rv2ide.tasks.runOnUiThread
 import com.tom.rv2ide.utils.customOrJBMono
+import com.tom.rv2ide.artificial.completion.SuggestionView
 import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.text.LineSeparator
 import io.github.rosemoe.sora.widget.CodeEditor
@@ -76,31 +61,22 @@ import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import org.slf4j.LoggerFactory
+import com.tom.rv2ide.managers.PreferenceManager
+import android.graphics.Typeface
 
-// import com.tom.rv2ide.lsp.kotlin.utils.LspUtils // handled in the server now
-
-/**
- * A view that handles opened code editor.
- *
- * @author Akash Yadav
- * @modification Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
- */
 @SuppressLint("ViewConstructor")
 class CodeEditorView(context: Context, file: File, selection: Range) :
     LinearLayoutCompat(context), Closeable {
 
   private var _binding: LayoutCodeEditorBinding? = null
   private var _searchLayout: EditorSearchLayout? = null
-
+  private var _suggestionView: SuggestionView? = null
+  private val prefManager: PreferenceManager
+    get() = BaseApplication.getBaseInstance().prefManager
+    
   private val codeEditorScope =
       CoroutineScope(Dispatchers.Default + CoroutineName("CodeEditorView"))
 
-  /**
-   * The [CoroutineContext][kotlin.coroutines.CoroutineContext] used to reading and writing the file
-   * in this editor. We use a separate, single-threaded context assuming that the file will be
-   * either read from or written to at a time, but not both. If in future we add support for
-   * anything like that, the number of thread should probably be increased.
-   */
   @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
   private val readWriteContext = newSingleThreadContext("CodeEditorView")
 
@@ -109,6 +85,9 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
 
   private val searchLayout: EditorSearchLayout
     get() = checkNotNull(_searchLayout) { "Search layout has been destroyed" }
+
+  val suggestionView: SuggestionView?
+    get() = _suggestionView
 
   private var analysisJob: Job? = null
 
@@ -129,7 +108,6 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
     get() = editor?.isModified ?: false
 
   companion object {
-
     private val log = LoggerFactory.getLogger(CodeEditorView::class.java)
   }
 
@@ -151,10 +129,32 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
       }
     }
 
+    // Create SuggestionView programmatically
+    _suggestionView = SuggestionView(context).apply {
+      layoutParams = FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.WRAP_CONTENT,
+        FrameLayout.LayoutParams.WRAP_CONTENT
+      ).apply {
+        // Position it at the top-left of the editor with some margin
+        val margin = SizeUtils.dp2px(8f)
+        setMargins(margin, margin, margin, margin)
+      }
+      elevation = SizeUtils.dp2px(8f).toFloat()
+      visibility = GONE // Hidden by default
+    }
+
     orientation = VERTICAL
 
     removeAllViews()
-    addView(binding.root, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+    
+    // Wrap the editor in a FrameLayout so we can overlay the suggestion view
+    val editorContainer = FrameLayout(context).apply {
+      layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
+      addView(binding.root)
+      _suggestionView?.let { addView(it) }
+    }
+    
+    addView(editorContainer)
     addView(searchLayout, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
     readFileAndApplySelection(file, selection)
@@ -168,7 +168,7 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
         event: io.github.rosemoe.sora.event.ContentChangeEvent,
         _: Any? ->
       val editorFile = binding.editor.file
-      if (editorFile != null && (editorFile.extension == "kt" || editorFile.extension == "kts")) {
+      if (editorFile != null && (editorFile.extension == "kt")) {
         startDiagnosticAnalysis(editorFile)
       }
     }
@@ -237,11 +237,6 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
     withContext(Dispatchers.Main.immediate) {
       withEditingDisabled {
         withContext(readWriteContext) {
-          // Do not call suspend functions in this scope
-          // the writeTo function acquires lock to the Content object before writing and releases
-          // the lock after writing
-          // if there are any suspend function calls in between, the lock and unlock calls might not
-          // be called on the same thread
           text.writeTo(file, this@CodeEditorView::updateReadWriteProgress)
         }
       }
@@ -256,12 +251,10 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
   }
 
   private fun startDiagnosticAnalysis(file: File) {
-    // Cancel previous analysis
     analysisJob?.cancel()
 
     analysisJob =
         codeEditorScope.launch {
-          // Wait a bit for typing to finish
           delay(500)
 
           val editor = _binding?.editor ?: return@launch
@@ -269,14 +262,13 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
 
           if (
               languageServer is KotlinLanguageServer &&
-                  (file.extension == "kt" || file.extension == "kts")
+                  (file.extension == "kt")
           ) {
             try {
               val result = languageServer.analyze(file.toPath())
 
               if (result != DiagnosticResult.NO_UPDATE) {
                 withContext(Dispatchers.Main) {
-                  // Access the diagnostics field directly
                   editor.updateEditorDiagnostics(result.diagnostics)
                 }
               }
@@ -284,25 +276,26 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
               log.error("Failed to analyze file for diagnostics", e)
             }
           }
+          
+          // Clang lsp
+          if (
+              languageServer is ClangLanguageServer &&
+                  (file.extension == "cpp" || file.extension == "c")
+          ) {
+            try {
+              val result = languageServer.analyze(file.toPath())
 
-          // || planned for v..03
-          // val cppExtensions = setOf("c", "h", "cpp", "cxx", "cc", "c++", "hpp", "hxx", "hh",
-          // "h++", "ixx", "cppm", "mxx", "inl")
-          // if (languageServer is ClangLanguageServer && file.extension in cppExtensions) {
-          // try {
-          // val result = languageServer.analyze(file.toPath())
-
-          // if (result != DiagnosticResult.NO_UPDATE) {
-          // withContext(Dispatchers.Main) {
-          // // Access the diagnostics field directly
-          // editor.updateEditorDiagnostics(result.diagnostics)
-          // }
-          // }
-          // } catch (e: Exception) {
-          // log.error("Failed to analyze file for diagnostics", e)
-          // }
-          // }
-
+              if (result != DiagnosticResult.NO_UPDATE) {
+                withContext(Dispatchers.Main) {
+                  editor.updateEditorDiagnostics(result.diagnostics)
+                }
+              }
+            } catch (e: Exception) {
+              log.error("Failed to analyze file for diagnostics", e)
+            }
+          }
+          
+          
         }
   }
 
@@ -355,10 +348,6 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
 
       ideEditor.setText(content, args)
 
-      // editor.setText(...) sets the modified flag to true
-      // but in this case, file is read from disk and hence the contents are not modified at all
-      // so the flag must be changed to unmodified
-      // TODO: Find a better way to check content modification status
       markUnmodified()
       postRead(file)
 
@@ -377,22 +366,15 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
       binding.editor.setLanguageClient(IDELanguageClientImpl.getInstance())
     }
 
-    // File must be set only after setting the language server
-    // This will make sure that textDocument/didOpen is sent
     binding.editor.file = file
 
-    // Initialize diagnostic handling for Kotlin files
-    if (file.extension == "kt" || file.extension == "kts") {
+    if (file.extension == "kt") {
       binding.editor.initDiagnosticHandling()
       startDiagnosticAnalysis(file)
     }
     binding.editor.initCompletionTooltips()
-    // if (LspUtils.isHoverEnabled() == true) {
     binding.editor.initHoverTooltips()
-    // }
 
-    // do not pass this editor instance
-    // symbol input must be updated for the current editor
     (context as? BaseEditorActivity?)?.refreshSymbolInput()
     (context as? Activity?)?.invalidateOptionsMenu()
   }
@@ -406,11 +388,8 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
         when (file.extension) {
           "java" -> JavaLanguageServer.SERVER_ID
           "xml" -> XMLLanguageServer.SERVER_ID
-          "kt",
-          "kts" -> KotlinLanguageServer.SERVER_ID
-          // || planned for v..03
-          // "c", "h", "cpp", "cxx", "cc", "c++", "hpp", "hxx", "hh", "h++", "ixx", "cppm", "mxx",
-          // "inl" -> ClangLanguageServer.SERVER_ID
+          "kt" -> KotlinLanguageServer.SERVER_ID
+          "cpp", "c" -> ClangLanguageServer.SERVER_ID
           else -> return null
         }
     return ILanguageServerRegistry.getDefault().getServer(serverID)
@@ -441,7 +420,7 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
   }
 
   private fun onInputTypePrefChanged() {
-    binding.editor.inputType = createInputTypeFlags()
+      binding.editor.inputType = createInputTypeFlags()
   }
 
   private fun onPrintingFlagsPrefChanged() {
@@ -483,7 +462,13 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
 
   private fun onCustomFontPrefChanged() {
     val state = EditorPreferences.useCustomFont
-    binding.editor.typefaceText = customOrJBMono(state)
+    var fontPath = "${com.tom.rv2ide.utils.Environment.HOME}/.androidide/ui/${EditorPreferences.selectedCustomFont}"
+    if (fontPath == "${com.tom.rv2ide.utils.Environment.HOME}/.androidide/ui/null") {
+      fontPath = "${com.tom.rv2ide.utils.Environment.HOME}/.androidide/ui/jetbrains-mono.ttf"
+    }
+    val typeface = if (fontPath != null) Typeface.createFromFile(fontPath) else Typeface.MONOSPACE
+    
+    binding.editor.typefaceText = typeface
     binding.editor.typefaceLineNumber = customOrJBMono(state)
   }
 
@@ -503,20 +488,10 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
     binding.editor.setPinLineNumber(EditorPreferences.pinLineNumbers)
   }
 
-  /**
-   * For internal use only!
-   *
-   * Marks this editor as unmodified. Used only when the activity is being destroyed.
-   */
   internal fun markUnmodified() {
     binding.editor.markUnmodified()
   }
 
-  /**
-   * For internal use only!
-   *
-   * Marks this editor as modified.
-   */
   internal fun markModified() {
     binding.editor.markModified()
   }
@@ -538,7 +513,8 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
       EditorPreferences.FLAG_WS_EMPTY_LINE,
       EditorPreferences.FLAG_WS_LEADING,
       EditorPreferences.FLAG_WS_TRAILING -> onPrintingFlagsPrefChanged()
-
+      EditorPreferences.KEYBOARD_SUGGESTIONS -> onInputTypePrefChanged()
+    
       EditorPreferences.FLAG_PASSWORD -> onInputTypePrefChanged()
       EditorPreferences.WORD_WRAP -> onWordwrapPrefChanged()
       EditorPreferences.USE_MAGNIFER -> onMagnifierPrefChanged()
@@ -551,7 +527,6 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
     }
   }
 
-  /** Notifies the editor that its content has been saved. */
   private fun notifySaved() {
     binding.editor.dispatchDocumentSaveEvent()
   }
@@ -574,9 +549,7 @@ class CodeEditorView(context: Context, file: File, selection: Range) :
     _binding?.editor?.apply {
       clearDiagnostics()
       cleanupCompletionTooltips()
-      // if (LspUtils.isHoverEnabled() == true) {
       cleanupHoverTooltips()
-      // }
       notifyClose()
       release()
     }

@@ -30,6 +30,9 @@ object Options {
   /** Use Gradle Kotlin DSL (.gradle.kts) instead of Groovy (.gradle). Default: true */
   var OPT_USE_GRADLE_KTS: Boolean = false
 
+  /** Minimum SDK API level for the project. Default: 21 */
+  var OPT_MIN_SDK: Int = 21
+  
   /** Use CMake build system instead of ndk build system. Default: false */
   var OPT_BUILD_SYSTEM_USE_CMAKE: Boolean = false
 
@@ -61,5 +64,6 @@ object Options {
     OPT_NATIVE_LANGUAGE = "cpp"
     OPT_SELECTED_NDK_VERSION = null
     OPT_CMAKE_PATH = null
+    OPT_MIN_SDK = 21
   }
 }

@@ -5,6 +5,7 @@ clear_runs.py
 autopush.sh
 server
 java/lsp/src/main/java/com/tom/rv2ide/lsp/clang
+local.properties
 
 # Crowdin
 crowdin.properties

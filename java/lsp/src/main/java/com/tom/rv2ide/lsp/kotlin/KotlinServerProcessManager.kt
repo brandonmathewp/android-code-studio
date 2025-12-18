@@ -25,6 +25,7 @@ import com.tom.rv2ide.utils.Environment
 import java.io.*
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import org.slf4j.LoggerFactory
 
@@ -36,18 +37,24 @@ class KotlinServerProcessManager(context: Context) {
 
   companion object {
     private val log = LoggerFactory.getLogger(KotlinServerProcessManager::class.java)
+    // Optimized buffer sizes for better performance
+    private const val BUFFER_SIZE = 32768 // 32KB buffer
+    private const val MAX_CONTENT_LENGTH = 10485760 // 10MB max message size
   }
 
   private val context: Context = context.applicationContext
 
   private val gson = Gson()
   private var process: Process? = null
-  private var writer: OutputStreamWriter? = null
+  private var writer: BufferedWriter? = null
   private var reader: BufferedReader? = null
   private val nextId = AtomicInteger(1)
   private val pendingRequests = ConcurrentHashMap<Int, (JsonObject?) -> Unit>()
   private var diagnosticsCallback: ((DiagnosticResult) -> Unit)? = null
   private val notificationHandler = KotlinNotificationHandler()
+  
+  // Thread pool for handling responses asynchronously
+  private val executorService = Executors.newFixedThreadPool(2)
 
   fun setDiagnosticsCallback(callback: (DiagnosticResult) -> Unit) {
     diagnosticsCallback = callback
@@ -60,7 +67,7 @@ class KotlinServerProcessManager(context: Context) {
       return
     }
 
-    KslLogs.info("Starting Kotlin Language Server...")
+    KslLogs.info("Starting Kotlin Language Server with standard JSON-RPC...")
 
     val serverHome = Environment.SERVERS_KOTLIN_DIR
     val libDir = File(serverHome, "lib")
@@ -80,23 +87,34 @@ class KotlinServerProcessManager(context: Context) {
     val javaExec = findJavaExecutable()
     val androidClasspath = classpathProvider.getClasspath()
 
-    // Get Java home directory
     val javaHome =
         if (Environment.JAVA_HOME != null) {
           Environment.JAVA_HOME.absolutePath
         } else {
           Environment.PREFIX.absolutePath
         }
-
+    
+    val klsCacheDir = "${Environment.HOME}/klsCacheDir"
+    
+    // Optimized command with performance tuning JVM flags
     val command =
         listOf(
             javaExec,
-            "-DkotlinLanguageServer.version=1.3.13",
+            // Performance tuning flags
+            "-XX:+UseG1GC",
+            "-XX:+UseStringDeduplication",
+            "-XX:+OptimizeStringConcat",
+            "-XX:+TieredCompilation",
+            "-XX:TieredStopAtLevel=1", // Faster startup
+            "-Djava.awt.headless=true",
+            // Server properties
             "-DkotlinLanguageServer.skipClasspathResolution=true",
             "-DkotlinLanguageServer.predefinedClasspath=$androidClasspath",
             "-classpath",
             classpath,
             "org.javacs.kt.MainKt",
+            "--useCacheDir",
+            klsCacheDir
         )
 
     val processBuilder =
@@ -128,16 +146,26 @@ class KotlinServerProcessManager(context: Context) {
 
     try {
       process = processBuilder.start()
-      writer = OutputStreamWriter(process!!.outputStream, StandardCharsets.UTF_8)
-      reader = BufferedReader(InputStreamReader(process!!.inputStream, StandardCharsets.UTF_8))
+
+      // Use buffered streams with larger buffers for better performance
+      writer = BufferedWriter(
+          OutputStreamWriter(process!!.outputStream, StandardCharsets.UTF_8),
+          BUFFER_SIZE
+      )
+      reader = BufferedReader(
+          InputStreamReader(process!!.inputStream, StandardCharsets.UTF_8),
+          BUFFER_SIZE
+      )
 
       startReaderThread()
       startErrorReaderThread()
 
-      // Send initialization with completion capabilities
+      // Reduced wait time for faster startup
+      Thread.sleep(1000)
+
       sendInitialization()
 
-      KslLogs.info("Server started successfully with JAVA_HOME: {}", javaHome)
+      KslLogs.info("Server started successfully with standard JSON-RPC and JAVA_HOME: {}", javaHome)
     } catch (e: Exception) {
       KslLogs.error("Failed to start server", e)
     }
@@ -287,6 +315,7 @@ class KotlinServerProcessManager(context: Context) {
                 while (true) {
                   var contentLength = -1
 
+                  // Read headers
                   while (true) {
                     val line = r.readLine() ?: return@Thread
                     if (line.isEmpty()) break
@@ -296,8 +325,12 @@ class KotlinServerProcessManager(context: Context) {
                     }
                   }
 
-                  if (contentLength <= 0) continue
+                  if (contentLength <= 0 || contentLength > MAX_CONTENT_LENGTH) {
+                    KslLogs.warn("Invalid content length: {}", contentLength)
+                    continue
+                  }
 
+                  // Read content with optimized buffer
                   val buffer = CharArray(contentLength)
                   var totalRead = 0
                   while (totalRead < contentLength) {
@@ -307,20 +340,30 @@ class KotlinServerProcessManager(context: Context) {
                   }
 
                   val json = String(buffer)
-                  handleMessage(json)
+                  
+                  // Handle message asynchronously for better performance
+                  executorService.submit {
+                    handleMessage(json)
+                  }
                 }
               } catch (e: Exception) {
                 KslLogs.error("Error in reader thread", e)
               }
             },
-            "kls-stdio-reader",
+            "kls-jsonrpc-reader",
         )
+        .apply {
+          priority = Thread.MAX_PRIORITY // High priority for reading
+        }
         .start()
   }
 
   private fun startErrorReaderThread() {
     val errorReader =
-        BufferedReader(InputStreamReader(process!!.errorStream, StandardCharsets.UTF_8))
+        BufferedReader(
+            InputStreamReader(process!!.errorStream, StandardCharsets.UTF_8),
+            BUFFER_SIZE
+        )
     Thread(
             {
               try {
@@ -394,7 +437,7 @@ class KotlinServerProcessManager(context: Context) {
       } else if (obj.has("method")) {
         notificationHandler.handle(obj)
       } else {
-        KslLogs.warn("Message has neither id nor method: {}", json)
+        KslLogs.warn("Message has neither id nor method: {}", json.take(200))
       }
     } catch (e: Exception) {
       KslLogs.error("Error handling message: {}", json.take(200), e)
@@ -422,9 +465,15 @@ class KotlinServerProcessManager(context: Context) {
     try {
       sendRequest("shutdown", JsonObject()) {}
       sendNotification("exit", JsonObject())
+      
+      // Give server time to gracefully shutdown
+      Thread.sleep(500)
     } catch (e: Exception) {
       KslLogs.error("Error during shutdown", e)
     }
+
+    // Shutdown executor service
+    executorService.shutdown()
 
     try {
       writer?.close()

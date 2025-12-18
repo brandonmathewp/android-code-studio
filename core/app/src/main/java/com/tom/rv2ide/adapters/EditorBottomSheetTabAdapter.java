@@ -52,6 +52,10 @@ public class EditorBottomSheetTabAdapter extends FragmentStateAdapter {
             ++index));
     this.fragments.add(
         new Tab(fragmentActivity.getString(R.string.app_logs), AppLogFragment.class, ++index));
+
+    this.fragments.add(
+        new Tab(fragmentActivity.getString(R.string.title_terminal), TerminalFragment.class, ++index));
+
     this.fragments.add(
         new Tab(fragmentActivity.getString(R.string.ide_logs), IDELogFragment.class, ++index));
     this.fragments.add(

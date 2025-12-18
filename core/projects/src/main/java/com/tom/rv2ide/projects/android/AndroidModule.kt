@@ -380,7 +380,7 @@ open class AndroidModule( // Class must be open because BaseXMLTest mocks this..
         }
       })
 
-      log.info("Created {} resource tables for {} dependencies of module '{}'", it.size, deps, path)
+      // log.info("Created {} resource tables for {} dependencies of module '{}'", it.size, deps, path)
     }
   }
 

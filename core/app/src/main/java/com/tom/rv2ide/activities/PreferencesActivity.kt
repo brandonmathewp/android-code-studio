@@ -18,6 +18,7 @@ package com.tom.rv2ide.activities
 
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
 import androidx.core.graphics.Insets
 import androidx.fragment.app.Fragment
 import com.tom.rv2ide.R
@@ -26,7 +27,13 @@ import com.tom.rv2ide.databinding.ActivityPreferencesBinding
 import com.tom.rv2ide.fragments.IDEPreferencesFragment
 import com.tom.rv2ide.preferences.IDEPreferences as prefs
 import com.tom.rv2ide.preferences.addRootPreferences
+import com.tom.rv2ide.utils.Environment
 import kotlin.system.exitProcess
+import android.provider.OpenableColumns
+import android.net.Uri
+import java.io.File
+import android.app.Activity
+import android.content.Intent
 
 class PreferencesActivity : EdgeToEdgeIDEActivity() {
 
@@ -58,6 +65,55 @@ class PreferencesActivity : EdgeToEdgeIDEActivity() {
 
     rootFragment.arguments = args
     loadFragment(rootFragment)
+  }
+
+  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+      super.onActivityResult(requestCode, resultCode, data)
+      
+      if (requestCode == 1001 && resultCode == Activity.RESULT_OK) {
+          data?.data?.let { uri ->
+              try {
+                  val fontDir = File("${Environment.HOME}/.androidide/ui")
+                  if (!fontDir.exists()) {
+                      fontDir.mkdirs()
+                  }
+                  
+                  val fileName = getFileName(uri) ?: "custom_font.ttf"
+                  val destFile = File(fontDir, fileName)
+                  
+                  contentResolver.openInputStream(uri)?.use { input ->
+                      destFile.outputStream().use { output ->
+                          input.copyTo(output)
+                      }
+                  }
+                  
+                  Toast.makeText(this, "Font copied successfully: $fileName", Toast.LENGTH_SHORT).show()
+              } catch (e: Exception) {
+                  Toast.makeText(this, "Error copying font: ${e.message}", Toast.LENGTH_LONG).show()
+              }
+          }
+      }
+  }
+  
+  private fun getFileName(uri: Uri): String? {
+      var result: String? = null
+      if (uri.scheme == "content") {
+          contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+              if (cursor.moveToFirst()) {
+                  val columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                  if (columnIndex != -1) {
+                      result = cursor.getString(columnIndex)
+                  }
+              }
+          }
+      }
+      if (result == null) {
+          result = uri.path?.let { path ->
+              val cut = path.lastIndexOf('/')
+              if (cut != -1) path.substring(cut + 1) else path
+          }
+      }
+      return result
   }
 
   /** Force restart the entire application Call this method when theme changes need to be applied */

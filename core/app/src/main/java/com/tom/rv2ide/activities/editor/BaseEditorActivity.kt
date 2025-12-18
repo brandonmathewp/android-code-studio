@@ -15,9 +15,6 @@
  *   along with AndroidIDE.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Modified by Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
-// ++ auto save
-
 package com.tom.rv2ide.activities.editor
 
 import android.content.Context
@@ -28,6 +25,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Process
 import android.text.SpannableStringBuilder
+import android.widget.FrameLayout
 import android.text.Spanned
 import android.text.TextUtils
 import android.text.TextWatcher
@@ -44,6 +42,7 @@ import androidx.activity.result.contract.ActivityResultContracts.StartActivityFo
 import androidx.activity.viewModels
 import androidx.annotation.GravityInt
 import androidx.annotation.StringRes
+import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.collection.MutableIntIntMap
 import androidx.core.graphics.Insets
@@ -54,6 +53,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.core.view.updatePaddingRelative
+import androidx.lifecycle.lifecycleScope
 import com.blankj.utilcode.constant.MemoryConstants
 import com.blankj.utilcode.util.ConvertUtils.byte2MemorySize
 import com.blankj.utilcode.util.FileUtils
@@ -92,7 +92,10 @@ import com.tom.rv2ide.models.OpenedFile
 import com.tom.rv2ide.models.Range
 import com.tom.rv2ide.models.SearchResult
 import com.tom.rv2ide.preferences.internal.BuildPreferences
+import com.tom.rv2ide.projectdata.state.lsp.Index
+import com.tom.rv2ide.indexing.views.IndexingBanner
 import com.tom.rv2ide.projectdata.state.Initialization
+import com.tom.rv2ide.projectdata.logs.LogStream
 import com.tom.rv2ide.projects.IProjectManager
 import com.tom.rv2ide.tasks.cancelIfActive
 import com.tom.rv2ide.ui.CodeEditorView
@@ -107,17 +110,23 @@ import com.tom.rv2ide.utils.InstallationResultHandler.onResult
 import com.tom.rv2ide.utils.IntentUtils
 import com.tom.rv2ide.utils.MemoryUsageWatcher
 import com.tom.rv2ide.utils.flashError
+import com.tom.rv2ide.utils.flashInfo
+import com.tom.rv2ide.utils.flashSuccess
 import com.tom.rv2ide.utils.resolveAttr
 import com.tom.rv2ide.viewmodel.EditorViewModel
 import com.tom.rv2ide.xml.resources.ResourceTableRegistry
 import com.tom.rv2ide.xml.versions.ApiVersionsRegistry
 import com.tom.rv2ide.xml.widgets.WidgetTableRegistry
+import com.tom.rv2ide.setup.Setup
+import com.tom.rv2ide.experimental.depsupdater.DependencyUpdaterDialog
+import com.tom.rv2ide.preferences.internal.BuildPreferences.isKtIndexingNotificationEnabled
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -128,12 +137,13 @@ import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode.MAIN
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import com.tom.rv2ide.projects.internal.ProjectManagerImpl
+import io.github.mohammedbaqernull.seasonal.SeasonalEffects
 
 /**
  * Base class for EditorActivity which handles most of the view related things.
  *
  * original @author Akash Yadav
- *
  * @modification Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
  */
 @Suppress("MemberVisibilityCanBePrivate")
@@ -156,6 +166,8 @@ abstract class BaseEditorActivity :
   private val editorTextWatchers = ConcurrentHashMap<CodeEditorView, TextWatcher>()
   private val editorContentHashes = ConcurrentHashMap<CodeEditorView, Int>()
   private var lastAutoSaveCheck = 0L
+  
+  private lateinit var dependencyUpdater: DependencyUpdaterDialog
 
   var isDestroying = false
     protected set
@@ -557,6 +569,13 @@ abstract class BaseEditorActivity :
     cleanupAutoSaveForEditor(editor)
   }
 
+  protected fun onFileLoaded(editor: CodeEditorView, file: File) {
+      if (file.name == "build.gradle.kts" || file.name == "build.gradle") {
+          log.debug("Build file detected: ${file.name}, setting up dependency updater")
+          setupDependencyUpdater()
+      }
+  }
+  
   protected open fun preDestroy() {
     _binding = null
 
@@ -566,6 +585,7 @@ abstract class BaseEditorActivity :
 
     installationCallback?.destroy()
     installationCallback = null
+    SeasonalEffects.setSnowflakeCount(20)
 
     if (isDestroying) {
       saveAllPendingFiles()
@@ -577,6 +597,15 @@ abstract class BaseEditorActivity :
       pendingSaveFiles.clear()
 
       try {
+        val openedFiles = getOpenedFiles()
+        for (i in openedFiles.indices) {
+          provideEditorAt(i)?.editor?.release()
+        }
+      } catch (e: Exception) {
+        log.warn("Failed to release editors: ${e.message}")
+      }
+      
+      try {
         memoryUsageWatcher.stopWatching(true)
         memoryUsageWatcher.listener = null
       } catch (e: Exception) {
@@ -584,6 +613,7 @@ abstract class BaseEditorActivity :
       }
       editorActivityScope.cancelIfActive("Activity is being destroyed")
     }
+    
   }
 
   protected open fun postDestroy() {
@@ -667,6 +697,7 @@ override fun onApplySystemBarInsets(insets: Insets) {
     lifecycle.addObserver(mLifecycleObserver)
 
     setSupportActionBar(content.editorToolbar)
+    supportActionBar?.setDisplayShowTitleEnabled(false)
 
     setupDrawers()
     content.tabs.addOnTabSelectedListener(this)
@@ -695,19 +726,132 @@ override fun onApplySystemBarInsets(insets: Insets) {
 
     // Start auto-save mechanism
     startAutoSave()
+    
+    SeasonalEffects.setSnowflakeCount(0)
+    // Initialize lsp setup
+    val setup = Setup(this)
+    setup.scanProjectForLanguageServers(ProjectManagerImpl.getInstance().projectDir) { isSuccessfullyInstalled ->
+      if (isSuccessfullyInstalled) {
+        flashSuccess("Installation succeeded")
+        if (!editorViewModel.isInitializing) {
+          flashInfo("Reinitializing project...")
+          (this as? ProjectHandlerActivity)?.initializeProject()
+        }
+      }
+    }
 
-    // flashProgress(configure = { message("Indexing project...") }) { infoFlashbar ->
-    // lifecycleScope.launch {
-    // Initialization.isProjectInitializing.collect { isInitializing ->
-    // if (!isInitializing) {
-    // infoFlashbar.dismiss()
-    // }
-    // }
-    // }
-    // }
-
+    if (BuildPreferences.isKtIndexingNotificationEnabled) {
+      // Use IndexingBanner to show progress
+      val indexingBanner = IndexingBanner(this)
+      
+      lifecycleScope.launch {
+        LogStream.outputFlow.collect { logMessage ->
+          if (Index.isIndexing() && !Initialization.isProjectInitializing.value) {
+            indexingBanner.updateMessage(logMessage)
+          }
+        }
+      }
+      
+      lifecycleScope.launch {
+        combine(
+          Initialization.isProjectInitializing,
+          Index.isProjectIndexing
+        ) { isInitializing, isIndexing ->
+          !isInitializing && isIndexing
+        }.collect { shouldShowIndexing ->
+          if (shouldShowIndexing) {
+            indexingBanner.show()
+          } else {
+            indexingBanner.hide()
+          }
+        }
+      }
+    }
+    
+    
   }
 
+  private fun setupDependencyUpdater() {
+      if (BuildPreferences.isDependenciesUpdaterEnabled) {
+        val projectDir = ProjectManagerImpl.getInstance().projectDir
+        
+        val buildFile = findModuleBuildFile(projectDir)
+        val tomlFile = findLibsVersionsToml(projectDir)
+        
+        if (buildFile == null) {
+            log.debug("No module-level build file found for dependency updater")
+            return
+        }
+        
+        log.debug("Setting up dependency updater with build file: ${buildFile.absolutePath}")
+        
+        dependencyUpdater = DependencyUpdaterDialog(
+            context = this,
+            lifecycleOwner = this,
+            buildGradleFile = buildFile,
+            libsVersionsTomlFile = tomlFile,
+            onDependenciesUpdated = {
+                val currentFile = provideCurrentEditor()?.file
+                if (currentFile != null && currentFile.absolutePath == buildFile.absolutePath) {
+                    provideCurrentEditor()?.editor?.text?.let { text ->
+                        val updatedContent = buildFile.readText()
+                        text.delete(0, 0, text.lineCount - 1, text.getColumnCount(text.lineCount - 1))
+                        text.insert(0, 0, updatedContent)
+                    }
+                }
+            }
+        )
+        
+        log.debug("Calling checkForUpdates()")
+        dependencyUpdater.checkForUpdates()
+      }
+  }
+  
+  private fun findModuleBuildFile(projectDir: File): File? {
+      val possibleNames = listOf("build.gradle.kts", "build.gradle")
+      
+      projectDir.listFiles()?.forEach { file ->
+          if (file.isDirectory && !file.name.startsWith(".")) {
+              for (name in possibleNames) {
+                  val buildFile = File(file, name)
+                  if (buildFile.exists() && buildFile.isFile) {
+                      try {
+                          val content = buildFile.readText()
+                          if (content.contains("android {") && 
+                              (content.contains("namespace") || content.contains("applicationId"))) {
+                              log.debug("Found module build file: ${buildFile.absolutePath}")
+                              return buildFile
+                          }
+                      } catch (e: Exception) {
+                          log.warn("Failed to read build file: ${buildFile.absolutePath}", e)
+                      }
+                  }
+              }
+          }
+      }
+      
+      for (name in possibleNames) {
+          val buildFile = File(projectDir, name)
+          if (buildFile.exists() && buildFile.isFile) {
+              log.debug("Found root build file: ${buildFile.absolutePath}")
+              return buildFile
+          }
+      }
+      
+      log.warn("No module-level build file found in project directory")
+      return null
+  }
+  
+  private fun findLibsVersionsToml(projectDir: File): File? {
+      val tomlFile = File(projectDir, "gradle/libs.versions.toml")
+      if (tomlFile.exists() && tomlFile.isFile) {
+          log.debug("Found toml file: ${tomlFile.absolutePath}")
+          return tomlFile
+      }
+      log.debug("No libs.versions.toml file found")
+      return null
+  }
+    
   private fun onSwipeRevealDragProgress(progress: Float) {
     _binding?.apply {
       contentCard.progress = progress
@@ -881,7 +1025,6 @@ override fun onApplySystemBarInsets(insets: Insets) {
   override fun onStop() {
     super.onStop()
 
-    // Save all pending files before stopping
     saveAllPendingFiles()
 
     checkIsDestroying()
@@ -911,18 +1054,17 @@ override fun onApplySystemBarInsets(insets: Insets) {
   }
 
   override fun onTabSelected(tab: Tab) {
-    val position = tab.position
-    editorViewModel.displayedFileIndex = position
-
-    val editorView = provideEditorAt(position)!!
-    editorView.onEditorSelected()
-
-    editorViewModel.setCurrentFile(position, editorView.file)
-    refreshSymbolInput(editorView)
-    invalidateOptionsMenu()
-
-    // Initialize auto-save for the newly selected editor
-    initializeAutoSaveForEditor(editorView)
+      val position = tab.position
+      editorViewModel.displayedFileIndex = position
+  
+      val editorView = provideEditorAt(position)!!
+      editorView.onEditorSelected()
+  
+      editorViewModel.setCurrentFile(position, editorView.file)
+      refreshSymbolInput(editorView)
+      invalidateOptionsMenu()
+  
+      initializeAutoSaveForEditor(editorView)
   }
 
   override fun onTabUnselected(tab: Tab) {}

@@ -21,7 +21,7 @@ import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.preference.Preference
-import com.tom.rv2ide.R
+import com.tom.rv2ide.R as MainR
 import com.tom.rv2ide.preferences.internal.GeneralPreferences
 import com.tom.rv2ide.resources.R.drawable
 import com.tom.rv2ide.resources.R.string
@@ -30,6 +30,9 @@ import com.tom.rv2ide.ui.themes.IDETheme
 import com.tom.rv2ide.ui.themes.IThemeManager
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
+import com.tom.rv2ide.utils.AppRestartDialog
+import android.os.Handler
+import android.os.Looper
 
 @Parcelize
 class GeneralPreferencesScreen(
@@ -56,6 +59,7 @@ class InterfaceConfig(
   init {
     addPreference(UiMode())
     addPreference(ThemeSelector())
+    addPreference(Snowfall())
     addPreference(LocaleSelector())
   }
 }
@@ -119,7 +123,14 @@ class UiMode(
       entry: PreferenceChoices.Entry?,
       position: Int,
   ) {
-    GeneralPreferences.uiMode = (entry?.data as? Int?) ?: AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+    AppRestartDialog.show(preference.context) { restart ->
+        if (restart) { 
+            GeneralPreferences.uiMode = (entry?.data as? Int?) ?: AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+            android.widget.Toast.makeText(preference.context, "Restarting...", 0).show()
+            Handler(Looper.getMainLooper()).postDelayed({ AppRestartDialog.restartApp(preference.context) }, 1000)
+        }
+    }
+
   }
 }
 
@@ -151,7 +162,44 @@ class ThemeSelector(
       entry: PreferenceChoices.Entry?,
       position: Int,
   ) {
-    GeneralPreferences.selectedTheme = (entry?.data as? IDETheme?)?.name ?: IDETheme.DEFAULT.name
+    AppRestartDialog.show(preference.context) { restart ->
+        if (restart) { 
+            GeneralPreferences.selectedTheme = (entry?.data as? IDETheme?)?.name ?: IDETheme.DEFAULT.name
+            android.widget.Toast.makeText(preference.context, "Restarting...", 0).show()
+            Handler(Looper.getMainLooper()).postDelayed({ AppRestartDialog.restartApp(preference.context) }, 1000)
+        }
+    }
+  }
+}
+
+@Parcelize
+class Snowfall(
+    override val key: String = GeneralPreferences.SNOWFALL_OVERLAY,
+    override val title: Int = string.title_snowfall_overlay,
+    override val summary: Int? = string.msg_snowfall_overlay,
+    override val icon: Int? = MainR.drawable.snowflake,
+) : SwitchPreference() {
+
+  override fun onCreatePreference(context: Context): Preference {
+    val pref = super.onCreatePreference(context) as androidx.preference.SwitchPreference
+    pref.isChecked = GeneralPreferences.snowfallOverlay
+    return pref
+  }
+
+  override fun onPreferenceChanged(preference: Preference, newValue: Any?): Boolean {
+    val newSnowfallValue = newValue as Boolean? ?: GeneralPreferences.snowfallOverlay
+    
+    AppRestartDialog.show(preference.context) { restart ->
+      if (restart) {
+        GeneralPreferences.snowfallOverlay = newSnowfallValue
+        android.widget.Toast.makeText(preference.context, "Restarting...", android.widget.Toast.LENGTH_SHORT).show()
+        Handler(Looper.getMainLooper()).postDelayed({ 
+          AppRestartDialog.restartApp(preference.context) 
+        }, 1000)
+      }
+    }
+    
+    return false
   }
 }
 

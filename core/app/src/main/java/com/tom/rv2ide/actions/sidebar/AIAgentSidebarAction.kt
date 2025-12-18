@@ -13,7 +13,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *   along with AndroidCodeStudio.  If not, see <https://www.gnu.org/licenses/>.
- */
+*/
 
 package com.tom.rv2ide.actions.sidebar
 
@@ -23,19 +23,18 @@ import androidx.fragment.app.Fragment
 import com.tom.rv2ide.R
 import com.tom.rv2ide.actions.ActionData
 import com.tom.rv2ide.app.BaseApplication
-import com.tom.rv2ide.fragments.sidebar.AIAgentFragment
+import com.tom.rv2ide.fragments.sidebar.ArtificialFragment
 import com.tom.rv2ide.managers.PreferenceManager
 import kotlin.reflect.KClass
 
-/**
- * Sidebar action for AI Agent functionality.
- *
+/*
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
- */
+*/
+
 class AIAgentSidebarAction(context: Context, override val order: Int) : AbstractSidebarAction() {
 
   override val id: String = ID
-  override val fragmentClass: KClass<out Fragment> = AIAgentFragment::class
+  override val fragmentClass: KClass<out Fragment> = ArtificialFragment::class
 
   private val prefManager: PreferenceManager
     get() = BaseApplication.getBaseInstance().prefManager
@@ -52,7 +51,6 @@ class AIAgentSidebarAction(context: Context, override val order: Int) : Abstract
   }
 
   override suspend fun execAction(data: ActionData): Any {
-    // Check if AI Agent is enabled in preferences
     return prefManager.getBoolean("ai_agent_enabled", false)
   }
 }

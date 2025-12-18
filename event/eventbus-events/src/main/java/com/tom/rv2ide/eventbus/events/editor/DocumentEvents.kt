@@ -42,15 +42,55 @@ constructor(var closedFile: Path, val selectionRange: Range = Range.NONE) :
  * Dispatched when the content of the given opened document changes. The change can be either
  * performed by the user or the IDE itself.
  */
+fun interface DocumentTextProvider {
+
+  fun get(): String
+}
+
+class LazyDocumentTextProvider(private val supplier: () -> String) : DocumentTextProvider {
+
+  @Volatile private var cached: String? = null
+
+  override fun get(): String {
+    val existing = cached
+    if (existing != null) {
+      return existing
+    }
+    val resolved = supplier()
+    cached = resolved
+    return resolved
+  }
+}
+
 data class DocumentChangeEvent(
     var changedFile: Path,
     var changedText: String,
-    var newText: String? = null,
+    private var _newText: String? = null,
     var version: Int,
     var changeType: ChangeType,
     var changeDelta: Int,
     var changeRange: Range,
-) : DocumentEvent(changedFile)
+    var newTextProvider: DocumentTextProvider? = null,
+) : DocumentEvent(changedFile) {
+
+  var newText: String? = _newText
+    get() {
+      if (field == null) {
+        val resolved = newTextProvider?.get()
+        if (resolved != null) {
+          field = resolved
+          newTextProvider = null
+        }
+      }
+      return field
+    }
+    set(value) {
+      field = value
+      if (value != null) {
+        newTextProvider = null
+      }
+    }
+}
 
 /** Dispatched when the given document is saved to disk. */
 data class DocumentSaveEvent(var savedFile: Path) : DocumentEvent(savedFile)

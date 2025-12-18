@@ -25,5 +25,8 @@
 
     <dimen name="default_title_size">17sp</dimen>
     <dimen name="default_summary_size">12sp</dimen>
-        
+
+    <dimen name="dialog_padding">24dp</dimen>
+    <dimen name="dialog_padding_top">16dp</dimen>
+            
 </resources>

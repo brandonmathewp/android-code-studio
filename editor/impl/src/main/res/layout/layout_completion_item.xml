@@ -25,11 +25,35 @@
   android:minHeight="40dp"
   tools:ignore="SmallSp">
 
+  <com.google.android.material.card.MaterialCardView
+    android:id="@+id/completion_icon_card"
+    android:layout_width="20dp"
+    android:layout_height="20dp"
+    android:layout_marginStart="8dp"
+    app:cardBackgroundColor="?attr/colorPrimaryContainer"
+    app:cardCornerRadius="6dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp"
+    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toTopOf="parent">
+
+    <TextView
+      android:id="@+id/completion_iconText"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:gravity="center"
+      android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+      android:textColor="?attr/colorOnPrimaryContainer"
+      android:textSize="14sp"
+      tools:text="F" />
+
+  </com.google.android.material.card.MaterialCardView>
+
   <TextView
     android:id="@+id/completion_type"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:layout_marginTop="2dp"
     android:layout_marginEnd="4dp"
     android:ellipsize="start"
     android:gravity="center_vertical"
@@ -37,7 +61,8 @@
     android:textColor="?attr/colorSecondaryVariant"
     android:textSize="11sp"
     app:layout_constraintEnd_toEndOf="parent"
-    app:layout_constraintTop_toTopOf="parent"
+    app:layout_constraintTop_toTopOf="@id/completion_label"
+    app:layout_constraintBottom_toBottomOf="@id/completion_label"
     tools:text="Class" />
 
   <TextView
@@ -45,7 +70,6 @@
     android:textStyle="bold"
     android:layout_width="0dp"
     android:layout_height="wrap_content"
-    android:layout_marginTop="2dp"
     android:layout_marginStart="4dp"
     android:layout_marginEnd="4dp"
     android:ellipsize="end"
@@ -55,8 +79,10 @@
     android:textColor="?attr/colorOnPrimaryContainer"
     android:textSize="13sp"
     app:layout_constraintEnd_toStartOf="@id/completion_type"
-    app:layout_constraintStart_toEndOf="@id/completion_iconText"
+    app:layout_constraintStart_toEndOf="@id/completion_icon_card"
     app:layout_constraintTop_toTopOf="parent"
+    app:layout_constraintBottom_toTopOf="@id/completion_detail"
+    app:layout_constraintVertical_chainStyle="packed"
     tools:text="MainActivity" />
 
   <TextView
@@ -71,15 +97,15 @@
     android:textColor="?attr/colorSecondaryVariant"
     android:textSize="11sp"
     app:layout_constraintEnd_toEndOf="parent"
-    app:layout_constraintStart_toEndOf="@+id/completion_iconText"
+    app:layout_constraintStart_toEndOf="@+id/completion_icon_card"
     app:layout_constraintTop_toBottomOf="@id/completion_label"
+    app:layout_constraintBottom_toTopOf="@id/completion_api_info"
     tools:text="com.tom.rv2ide.activities.MainActivity" />
 
   <TextView
     android:id="@+id/completion_api_info"
     android:layout_width="0dp"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="2dp"
     android:layout_marginStart="4dp"
     android:layout_marginEnd="4dp"
     android:ellipsize="end"
@@ -89,24 +115,18 @@
     android:textColor="?attr/colorSecondaryVariant"
     android:textSize="11sp"
     app:layout_constraintEnd_toEndOf="parent"
-    app:layout_constraintStart_toEndOf="@id/completion_iconText"
+    app:layout_constraintStart_toEndOf="@id/completion_icon_card"
     app:layout_constraintTop_toBottomOf="@id/completion_detail"
+    app:layout_constraintBottom_toTopOf="@id/divider"
     tools:text="Added in API 1" />
 
-  <TextView
-    android:id="@+id/completion_iconText"
-    android:layout_width="30dp"
-    android:layout_height="0dp"
-    android:layout_marginEnd="8dp"
-    android:backgroundTint="?attr/colorPrimaryContainer"
-    android:gravity="center"
-    android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
-    android:textColor="?attr/colorOnPrimaryContainer"
-    android:textSize="14sp"
+  <View
+    android:id="@+id/divider"
+    android:layout_width="0dp"
+    android:layout_height="1dp"
+    android:background="?attr/colorOutlineVariant"
     app:layout_constraintBottom_toBottomOf="parent"
-    app:layout_constraintStart_toStartOf="parent"
-    app:layout_constraintTop_toTopOf="parent"
-    tools:text="F" />
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
-

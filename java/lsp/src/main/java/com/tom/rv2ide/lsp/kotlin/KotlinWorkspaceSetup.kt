@@ -25,6 +25,8 @@ import com.tom.rv2ide.lsp.kotlin.etc.LspFeatures
 import com.tom.rv2ide.projects.IWorkspace
 import com.tom.rv2ide.projects.ModuleProject
 import com.tom.rv2ide.projects.android.AndroidModule
+import com.tom.rv2ide.projectdata.state.lsp.Index
+import com.tom.rv2ide.projectdata.logs.LogStream
 import com.tom.rv2ide.utils.Environment
 import java.io.File
 import java.nio.file.*
@@ -101,6 +103,8 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
   fun setup(processManager: KotlinServerProcessManager) {
     val workspaceRoot = workspace.getProjectDir().toURI().toString()
     KslLogs.info("Setting up workspace with root: {}", workspaceRoot)
+    Index.setIsIndexing(true)
+    LogStream.emitLineBlocking("Setting up workspace...")
 
     LspFeatures.setProcessManager(processManager)
     initializeCompilerService()
@@ -181,8 +185,8 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
       // Start watcher coroutine
       watcherJob =
           watchScope.launch {
-            var lastReloadTime = 0L
-            val reloadDebounceMs = 500L // Wait 5 seconds after last change
+            var lastReloadTime = 250L
+            val reloadDebounceMs = 5000L // Wait 5 seconds after last change
 
             while (isActive) {
               try {
@@ -234,6 +238,7 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
   private suspend fun reloadClasspathAndIndex(processManager: KotlinServerProcessManager) {
     withContext(Dispatchers.IO) {
       try {
+        Index.setIsIndexing(true)  // Set flag when reload starts
         KslLogs.info("=== RELOADING CLASSPATH AND INDEX ===")
 
         // Invalidate classpath cache
@@ -249,19 +254,21 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
         val currentClasspath = classpathProvider.getClasspathList()
         val currentHash = indexCache.computeClasspathHash(currentClasspath)
 
-        // Trigger reindexing
+        // Trigger reindexing (this will also manage the Index flag)
         val workspaceRoot = workspace.getProjectDir().toURI().toString()
         triggerIndexing(processManager, workspaceRoot, currentHash)
 
         KslLogs.info("Classpath and index reloaded successfully")
       } catch (e: Exception) {
         KslLogs.error("Failed to reload classpath and index", e)
+        Index.setIsIndexing(false)  // Reset flag on error
       }
     }
   }
 
   private fun restoreCachedIndex(processManager: KotlinServerProcessManager) {
     KslLogs.info("Restoring index from cache...")
+    Index.setIsIndexing(true)  // Set indexing flag when starting cache restoration
 
     val cachedSymbols = indexCache.loadCache()
     if (cachedSymbols != null && cachedSymbols.size() > 0) {
@@ -285,8 +292,10 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
 
       processManager.sendNotification("workspace/didChangeConfiguration", configParams)
       KslLogs.info("Cache restored with {} symbols - indexing skipped", cachedSymbols.size())
+      Index.setIsIndexing(false)  // Reset flag after cache restoration
     } else {
       // Cache load failed, trigger fresh indexing
+      // Index flag will be managed by triggerIndexing
       val currentClasspath = classpathProvider.getClasspathList()
       val currentHash = indexCache.computeClasspathHash(currentClasspath)
       triggerIndexing(processManager, workspace.getProjectDir().toURI().toString(), currentHash)
@@ -299,6 +308,7 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
       classpathHash: String,
   ) {
     KslLogs.info("Triggering classpath indexing...")
+    Index.setIsIndexing(true)  // Set indexing flag when starting
 
     val configParams =
         JsonObject().apply {
@@ -323,13 +333,18 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
     val symbolParams = JsonObject().apply { addProperty("query", "") }
 
     processManager.sendRequest("workspace/symbol", symbolParams) { result ->
-      val symbols = result?.getAsJsonArray("symbols") ?: JsonArray()
-      val symbolCount = symbols.size()
-      KslLogs.info("Indexing complete, found {} symbols", symbolCount)
+      try {
+        val symbols = result?.getAsJsonArray("symbols") ?: JsonArray()
+        val symbolCount = symbols.size()
+        KslLogs.info("Indexing complete, found {} symbols", symbolCount)
 
-      // Save to cache
-      if (symbolCount > 0) {
-        indexCache.saveCache(symbols, classpathHash)
+        // Save to cache
+        if (symbolCount > 0) {
+          indexCache.saveCache(symbols, classpathHash)
+        }
+      } finally {
+        // Always reset the flag when indexing completes (success or failure)
+        Index.setIsIndexing(false)
       }
     }
   }
@@ -363,6 +378,8 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
       if (mainModule != null) {
         compilerService = KotlinCompilerProvider.get(mainModule)
         KslLogs.info("Initialized compiler service for: {}", mainModule.path)
+        Index.setIsIndexing(true)
+        LogStream.emitLineBlocking("Initialized compiler service for: ${mainModule.path}")
       } else {
         KslLogs.warn("No Android module found, using default compiler")
         compilerService = KotlinCompilerService.NO_MODULE_COMPILER
@@ -485,9 +502,9 @@ class KotlinWorkspaceSetup(private val context: Context, private val workspace: 
 
             val initOptions =
                 JsonObject().apply {
-                  addProperty("storagePath", workspace.getProjectDir().resolve(".kls").absolutePath)
+                  addProperty("storagePath", workspace.getProjectDir().resolve(".acside").absolutePath)
 
-                  addProperty("indexing", "full")
+                  addProperty("indexing", "auto")
                   addProperty("externalSources", "auto")
 
                   add(

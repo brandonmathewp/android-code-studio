@@ -148,3 +148,8 @@
 -dontwarn org.ietf.jgss.GSSManager
 -dontwarn org.ietf.jgss.GSSName
 -dontwarn org.ietf.jgss.Oid
+
+-keep class * extends java.lang.Record { *; }
+-keepclassmembers class * extends java.lang.Record {
+    <init>(...);
+}

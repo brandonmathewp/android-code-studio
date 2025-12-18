@@ -16,6 +16,8 @@
  */
 package com.tom.rv2ide.lsp.java.providers
 
+import android.os.Process
+
 import com.tom.rv2ide.lsp.java.compiler.CompileTask
 import com.tom.rv2ide.lsp.java.compiler.JavaCompilerService
 import com.tom.rv2ide.lsp.java.providers.DiagnosticsProvider.findDiagnostics
@@ -127,6 +129,7 @@ class JavaDiagnosticProvider {
     }
 
     override fun run() {
+      Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
       result =
           try {
                 compiler.compile(file).get { task -> doAnalyze(file, task) }

@@ -62,32 +62,32 @@ class KotlinCompletionConverter {
     this.javaCompilerBridge = bridge
   }
 
-  /** Enhanced conversion that adds classpath-based completions */
   suspend fun convertWithClasspathEnhancement(
       itemsArray: JsonArray,
       fileContent: String,
       prefix: String,
-  ): List<CompletionItem> =
-      withContext(cpuDispatcher) {
-        KslLogs.debug("Converting {} items with classpath enhancement", itemsArray.size())
-
-        // Convert LSP server items
-        val lspItems = convertFast(itemsArray, fileContent, prefix)
-
-        // Add classpath-based completions if prefix is valid
-        val classpathItems =
-            if (prefix.length >= 2 && javaCompilerBridge != null) {
+  ): List<CompletionItem> = withContext(cpuDispatcher) {
+      KslLogs.debug("Converting {} items with classpath enhancement", itemsArray.size())
+  
+      // Process BOTH in parallel
+      val lspItemsDeferred = async { convertFast(itemsArray, fileContent, prefix) }
+      
+      val classpathItemsDeferred = async {
+          if (prefix.length >= 2 && javaCompilerBridge != null) {
               getClasspathCompletions(prefix, fileContent)
-            } else {
+          } else {
               emptyList()
-            }
-
-        // Merge and deduplicate
-        val allItems = (lspItems + classpathItems).distinctBy { "${it.ideLabel}:${it.detail}" }
-
-        KslLogs.debug("Total items after classpath enhancement: {}", allItems.size)
-        allItems
+          }
       }
+      
+      val lspItems = lspItemsDeferred.await()
+      val classpathItems = classpathItemsDeferred.await()
+  
+      val allItems = (lspItems + classpathItems).distinctBy { "${it.ideLabel}:${it.detail}" }
+  
+      KslLogs.debug("Total items after classpath enhancement: {}", allItems.size)
+      allItems
+  }
 
   /** Get completion items from classpath (Java compiler) */
   private fun getClasspathCompletions(prefix: String, fileContent: String): List<CompletionItem> {
@@ -205,37 +205,37 @@ class KotlinCompletionConverter {
       itemsArray: JsonArray,
       fileContent: String,
       prefix: String,
-  ): List<CompletionItem> =
-      withContext(Dispatchers.Default) {
-        KslLogs.debug("Fast converting {} items", itemsArray.size())
-
-        val results = mutableListOf<CompletionItem>()
-
-        for (element in itemsArray) {
-          try {
-            val item = element.asJsonObject
-            val converted = convertItemFast(item, fileContent, prefix)
-
-            if (
-                converted.ideLabel.isNotBlank() &&
-                    converted.ideLabel != "K" &&
-                    converted.ideLabel != "Keyword"
-            ) {
-              results.add(converted)
-            }
-          } catch (e: Exception) {
-            // Skip problematic items silently
+  ): List<CompletionItem> = withContext(cpuDispatcher) {
+      KslLogs.debug("Fast converting {} items", itemsArray.size())
+  
+      val cpuCount = Runtime.getRuntime().availableProcessors()
+      val itemsList = itemsArray.toList()
+      val chunkSize = (itemsList.size / cpuCount).coerceAtLeast(10)
+      
+      val results = itemsList.chunked(chunkSize).map { chunk ->
+          async {
+              val chunkResults = mutableListOf<CompletionItem>()
+              for (element in chunk) {
+                  try {
+                      val item = element.asJsonObject
+                      val converted = convertItemFast(item, fileContent, prefix)
+  
+                      if (converted.ideLabel.isNotBlank() &&
+                          converted.ideLabel != "K" &&
+                          converted.ideLabel != "Keyword") {
+                          chunkResults.add(converted)
+                      }
+                  } catch (e: Exception) {
+                      // Skip
+                  }
+              }
+              chunkResults
           }
-
-          // Yield to prevent blocking
-          if (results.size % 20 == 0) {
-            yield()
-          }
-        }
-
-        KslLogs.debug("Converted {} items", results.size)
-        results
-      }
+      }.awaitAll().flatten()
+  
+      KslLogs.debug("Converted {} items", results.size)
+      results
+  }
 
   private fun convertItemFast(
       item: JsonObject,

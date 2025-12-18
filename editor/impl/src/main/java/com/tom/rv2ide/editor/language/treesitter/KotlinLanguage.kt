@@ -24,6 +24,7 @@ import com.tom.rv2ide.lsp.api.ILanguageServerRegistry
 import com.tom.rv2ide.lsp.kotlin.KotlinLanguageServer
 import com.tom.rv2ide.treesitter.kotlin.TSLanguageKotlin
 import io.github.rosemoe.sora.lang.Language.INTERRUPTION_LEVEL_STRONG
+import io.github.rosemoe.sora.lang.Language.INTERRUPTION_LEVEL_NONE
 import io.github.rosemoe.sora.util.MyCharacter
 
 /**
@@ -49,6 +50,6 @@ open class KotlinLanguage(context: Context) :
   }
 
   override fun getInterruptionLevel(): Int {
-    return INTERRUPTION_LEVEL_STRONG
+    return INTERRUPTION_LEVEL_NONE
   }
 }

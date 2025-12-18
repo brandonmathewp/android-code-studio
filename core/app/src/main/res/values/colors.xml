@@ -20,4 +20,16 @@
   <!-- Sub-Module Maker Colors -->
   <color name="success">#4CAF50</color>
   <color name="error">#F44336</color>
+
+  <color name="black">#FF000000</color>
+  <color name="white">#FFFFFFFF</color>
+  <color name="primary">?attr/colorPrimary</color>
+
+  <!-- Git change type colors -->
+  <color name="change_untracked">#43A047</color>
+  <color name="change_modified">#FB8C00</color>
+  <color name="change_added">#1E88E5</color>
+  <color name="change_deleted">#E53935</color>
+  <color name="change_conflicting">#8E24AA</color>
+
 </resources>

@@ -20,11 +20,15 @@ package com.tom.rv2ide.editor.ui
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.view.View.MeasureSpec
 import android.view.ViewGroup
 import androidx.appcompat.view.menu.MenuBuilder
@@ -86,7 +90,6 @@ open class EditorActionsMenu(val editor: IDEEditor) :
   private var mLastPosition: Int = 0
 
   private val contentHeight by lazy {
-    // approximated size is around 56dp
     SizeUtils.dp2px(56f)
   }
 
@@ -98,7 +101,7 @@ open class EditorActionsMenu(val editor: IDEEditor) :
     applyBackground()
 
     list.apply {
-      clipChildren = true
+      clipChildren = false
       clipToOutline = true
       isVerticalFadingEdgeEnabled = true
       isVerticalScrollBarEnabled = true
@@ -108,8 +111,9 @@ open class EditorActionsMenu(val editor: IDEEditor) :
               ViewGroup.LayoutParams.WRAP_CONTENT,
           )
 
-      setFadingEdgeLength(SizeUtils.dp2px(42f))
-      setPaddingRelative(paddingStart, paddingTop, SizeUtils.dp2px(16f), paddingBottom)
+      setFadingEdgeLength(SizeUtils.dp2px(48f))
+      setPaddingRelative(SizeUtils.dp2px(4f), SizeUtils.dp2px(4f), SizeUtils.dp2px(4f), SizeUtils.dp2px(4f))
+      elevation = SizeUtils.dp2px(8f).toFloat()
     }
 
     popup.contentView = this.list
@@ -197,7 +201,7 @@ open class EditorActionsMenu(val editor: IDEEditor) :
   protected open fun applyBackground() {
     val drawable = GradientDrawable()
     drawable.shape = GradientDrawable.RECTANGLE
-    drawable.cornerRadius = SizeUtils.dp2px(28f).toFloat() // Recommeneded size is 28dp
+    drawable.cornerRadius = SizeUtils.dp2px(16f).toFloat()
     drawable.color = ColorStateList.valueOf(editor.context.resolveAttr(R.attr.colorSurface))
     drawable.setStroke(SizeUtils.dp2px(1f), editor.context.resolveAttr(R.attr.colorOutline))
     list.background = drawable
@@ -231,7 +235,6 @@ open class EditorActionsMenu(val editor: IDEEditor) :
 
   private fun selectTop(rect: RectF): Int {
     val rowHeight = editor.rowHeight
-    // when the window is being shown for the first time, the height is 0
     val height = if (this.height == 0) contentHeight else this.height
     return if (rect.top - rowHeight * 3 / 2f > height) {
       (rect.top - rowHeight * 3 / 2 - height).toInt()
@@ -303,7 +306,7 @@ open class EditorActionsMenu(val editor: IDEEditor) :
     data.put(
         CodeEditor::class.java,
         editor,
-    ) // For LSP actions, as they cannot access IDEEditor class
+    )
     data.put(File::class.java, editor.file)
     data.put(DiagnosticItem::class.java, getDiagnosticAtCursor())
     data.put(com.tom.rv2ide.models.Range::class.java, editor.cursorLSPRange)
@@ -337,15 +340,19 @@ open class EditorActionsMenu(val editor: IDEEditor) :
     if (list.parent != null) {
       (list.parent as ViewGroup).removeView(list)
     }
-
+  
     this.list.layoutManager = LinearLayoutManager(editor.context, RecyclerView.HORIZONTAL, false)
-
+    
+    if (this.list.itemDecorationCount == 0) {
+      this.list.addItemDecoration(DividerItemDecoration(editor.context))
+    }
+  
     fillMenu()
-
+  
     measureActionsList()
-
+  
     val height = list.measuredHeight
-    val width = min(editor.width - SizeUtils.dp2px(32f), list.measuredWidth)
+    val width = min(editor.width - SizeUtils.dp2px(45f), list.measuredWidth)
     setSize(width, height)
     super.show()
   }
@@ -365,10 +372,10 @@ open class EditorActionsMenu(val editor: IDEEditor) :
     val text =
         LayoutInflater.from(editor.context).inflate(layout.layout_popup_menu_item, null)
             as MaterialButton
-    val dp30 = SizeUtils.dp2px(30f)
+    val dp30 = SizeUtils.dp2px(10f)
     val paddingHorizontal = text.paddingStart + text.paddingEnd
     val drawablePadding = text.iconPadding
-    val extraWidth = dp30 * 2 // 30dp for start and end drawables both
+    val extraWidth = dp30 * 2
 
     for (i in 0 until getMenu().size()) {
       val item = getMenu().getItem(i)
@@ -385,43 +392,88 @@ open class EditorActionsMenu(val editor: IDEEditor) :
     return widest
   }
 
+  private class DividerItemDecoration(context: Context) : RecyclerView.ItemDecoration() {
+    
+    private val paint = Paint().apply {
+      color = context.resolveAttr(R.attr.colorOutlineVariant)
+      isAntiAlias = true
+    }
+    
+    private val dividerHeight = SizeUtils.dp2px(24f)
+    private val itemSpacing = SizeUtils.dp2px(0f)
+  
+    override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) {
+      val position = parent.getChildAdapterPosition(view)
+      if (position < parent.adapter!!.itemCount - 1) {
+        outRect.right = itemSpacing
+      }
+      if (position > 0) {
+        outRect.left = itemSpacing
+      }
+    }
+  
+    override fun onDrawOver(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
+      val childCount = parent.childCount
+      
+      for (i in 0 until childCount - 1) {
+        val child = parent.getChildAt(i)
+        val params = child.layoutParams as RecyclerView.LayoutParams
+        
+        val x = child.right + params.rightMargin + itemSpacing.toFloat()
+        val top = child.top + (child.height - dividerHeight) / 2f
+        val bottom = top + dividerHeight
+        
+        c.drawLine(x, top, x, bottom, paint)
+      }
+    }
+  }
+  
   private class ActionsListAdapter(val menu: Menu?, val forceShowTitle: Boolean = false) :
       RecyclerView.Adapter<VH>() {
-
+  
     override fun getItemCount(): Int {
       return menu?.size() ?: 0
     }
-
+  
     fun getItem(position: Int): MenuItem? = menu?.getItem(position)
-
+  
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
       return VH(
           LayoutPopupMenuItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
       )
     }
-
+  
     override fun onBindViewHolder(holder: VH, position: Int) {
       val item = getItem(position) ?: return
-      holder.binding.root.text = if (forceShowTitle) item.title else ""
-      holder.binding.root.tooltipText = item.title
-      holder.binding.root.icon =
-          item.icon
-              ?: run {
-                holder.binding.root.text = item.title
-                holder.binding.root.layoutParams.apply {
-                  width = ViewGroup.LayoutParams.WRAP_CONTENT
-                }
-                null
-              }
-      holder.binding.root.setOnClickListener { (item as MenuItemImpl).invoke() }
+      
+      holder.binding.root.apply {
+        text = if (forceShowTitle) item.title else ""
+        tooltipText = item.title
+        icon = item.icon ?: run {
+          text = item.title
+          layoutParams.apply {
+            width = ViewGroup.LayoutParams.WRAP_CONTENT
+          }
+          null
+        }
+        
+        setOnClickListener { (item as MenuItemImpl).invoke() }
+        
+        scaleX = 1f
+        scaleY = 1f
+        
+        iconSize = SizeUtils.dp2px(20f)
+        iconTint = ColorStateList.valueOf(context.resolveAttr(R.attr.colorOnSurface))
+        
+        cornerRadius = SizeUtils.dp2px(5f)
+        rippleColor = ColorStateList.valueOf(context.resolveAttr(R.attr.colorControlHighlight))
+      }
     }
-
+  
     inner class VH(val binding: LayoutPopupMenuItemBinding) : ViewHolder(binding.root)
   }
 
   override fun onMenuItemSelected(menu: MenuBuilder, item: MenuItem): Boolean {
-    // Click event of MenuItems without SubMenu is consumed by the ActionsRegistry
-    // So we only need to handle click event of SubMenus
     if (!item.hasSubMenu()) {
       return false
     }

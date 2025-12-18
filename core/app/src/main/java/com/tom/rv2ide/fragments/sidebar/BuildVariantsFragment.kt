@@ -28,6 +28,9 @@ import com.tom.rv2ide.fragments.EmptyStateFragment
 import com.tom.rv2ide.tooling.api.models.BuildVariantInfo
 import com.tom.rv2ide.viewmodel.BuildVariantsViewModel
 import com.tom.rv2ide.viewmodel.EditorViewModel
+import com.tom.rv2ide.utils.GradleFileWriter
+import com.tom.rv2ide.projects.IProjectManager
+import java.io.File
 
 /**
  * A fragment to show the list of Android modules and its build variants.
@@ -49,7 +52,6 @@ class BuildVariantsFragment :
       updateButtonStates(variantsViewModel.updatedBuildVariants)
     }
 
-    // observe values and update the button states accordingly
     variantsViewModel._updatedBuildVariants.observe(viewLifecycleOwner) { updatedVariants ->
       updateButtonStates(updatedVariants)
     }
@@ -62,7 +64,25 @@ class BuildVariantsFragment :
       updateButtonStates(variantsViewModel.updatedBuildVariants)
     }
 
-    binding.apply.setOnClickListener { (activity as? ProjectHandlerActivity?)?.initializeProject() }
+    binding.apply.setOnClickListener { 
+        val activity = activity as? ProjectHandlerActivity ?: return@setOnClickListener
+        val projectManager = IProjectManager.getInstance()
+        val projectDir = projectManager.projectDir
+        
+        variantsViewModel.updatedBuildVariants.values.forEach { variantInfo ->
+            val moduleDir = File(projectDir, variantInfo.projectPath.replace(":", File.separator))
+            GradleFileWriter.updateModuleBuildGradle(
+                moduleDir,
+                variantInfo.versionName,
+                variantInfo.versionCode,
+                variantInfo.minSdk,
+                variantInfo.targetSdk,
+                variantInfo.compileSdk
+            )
+        }
+        
+        activity.initializeProject()
+    }
 
     binding.discard.setOnClickListener {
       variantsViewModel.resetUpdatedSelections()
@@ -78,8 +98,6 @@ class BuildVariantsFragment :
 
   private fun updateButtonStates(updatedVariants: MutableMap<String, BuildVariantInfo>?) {
     _binding?.apply {
-      // enable buttons only if any of the project's selected build variant was changed
-      // also, changes can only if be applied if no build is in progress
       val isBuilding = editorViewModel.let { it.isBuildInProgress || it.isInitializing }
       val isEnabled = updatedVariants?.isNotEmpty() == true && !isBuilding
 
@@ -95,7 +113,12 @@ class BuildVariantsFragment :
       checkIsEmpty()
     }
   }
-
+  
+  override fun onDestroy() {
+      super.onDestroy()
+      com.tom.rv2ide.utils.EditorSidebarActions.removeFragmentFromCache("ide.editor.sidebar.buildVariants")
+  }
+  
   private fun checkIsEmpty() {
     emptyStateViewModel.isEmpty.value = _binding?.variantsList?.adapter?.itemCount == 0
   }

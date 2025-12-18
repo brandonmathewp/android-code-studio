@@ -123,6 +123,13 @@
                         android:text="@string/asset_studio_import_image"
                         style="@style/Widget.Material3.Button.OutlinedButton" />
 
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/m3IconsBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="M3 Icons"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+
                 </LinearLayout>
 
             </LinearLayout>

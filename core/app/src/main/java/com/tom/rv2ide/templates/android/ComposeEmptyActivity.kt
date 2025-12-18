@@ -33,6 +33,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.tom.rv2ide.templates.preferences.Options
 
 /*
  * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
@@ -286,7 +287,7 @@ class ComposeEmptyActivity : Template {
             defaultConfig(
                 DefaultConfig(
                     applicationId = packageHelper.getPackageId(),
-                    minSdk = 21,
+                    minSdk = Options.OPT_MIN_SDK,
                     targetSdk = 34,
                     versionCode = 1,
                     versionName = "1.0",

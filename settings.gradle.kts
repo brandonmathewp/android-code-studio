@@ -78,7 +78,7 @@ dependencyResolutionManagement {
 
 gradle.rootProject {
     val appMainVersion = System.getenv("MAIN_VERSION") ?: "1.0.0"
-    val revision = "r${System.getenv("REVISION_NUM") ?: "02-hotfix"}"
+    val revision = "r${System.getenv("REVISION_NUM") ?: "03"}"
     val baseVersion = "$appMainVersion+gh.$revision"
     println("Android code studio version: $baseVersion")
     project.setProperty("version", baseVersion)
@@ -94,6 +94,7 @@ include(
   ":external:acsprovider",
   ":external:atc",
   ":core:projectdata",
+  ":external:logwire",
   
   // ":server:server",
   // ":server:shared",
@@ -116,6 +117,7 @@ include(
   ":event:eventbus-android",
   ":event:eventbus-events",
   ":java:javac-services",
+  ":java:lsp-setup",
   ":java:lsp",
   ":logging:idestats",
   ":logging:logger",

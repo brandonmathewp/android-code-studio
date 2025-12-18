@@ -71,7 +71,7 @@ class KotlinClasspathProvider {
           classpaths.add(cp.absolutePath)
         }
       } catch (e: Exception) {
-        log.error("Failed to get classpath from compiler service", e)
+        KslLogs.error("Failed to get classpath from compiler service", e)
       }
     }
 
@@ -112,7 +112,7 @@ class KotlinClasspathProvider {
               val generatedJar = project.getGeneratedJar()
               if (generatedJar.exists()) {
                 classpaths.add(generatedJar.absolutePath)
-                log.info("Added generated JAR: {}", generatedJar.absolutePath)
+                KslLogs.info("Added generated JAR: {}", generatedJar.absolutePath)
               }
 
               // Add selected variant's class jars
@@ -129,13 +129,13 @@ class KotlinClasspathProvider {
         }
       }
     } catch (e: Exception) {
-      log.error("Failed to get classpath from project system", e)
+      KslLogs.error("Failed to get classpath from project system", e)
     }
 
     addKotlinScriptingJarsFromGradleCache(classpaths)
 
     val existingPaths = classpaths.filter { File(it).exists() }.toList()
-    log.info("Total classpath entries: {}, existing: {}", classpaths.size, existingPaths.size)
+    KslLogs.info("Total classpath entries: {}, existing: {}", classpaths.size, existingPaths.size)
 
     cachedClasspathList = existingPaths
     return existingPaths
@@ -171,11 +171,11 @@ class KotlinClasspathProvider {
       val buildDir = File(moduleDir, "build")
 
       if (!buildDir.exists()) {
-        log.warn("Build directory not found for module: {}", module.path)
+        KslLogs.warn("Build directory not found for module: {}", module.path)
         return
       }
 
-      log.info("Scanning for generated sources in: {}", buildDir.absolutePath)
+      KslLogs.info("Scanning for generated sources in: {}", buildDir.absolutePath)
       addExternalLibraryJars(buildDir, classpaths)
       // List of potential generated source directories
       val generatedPaths =
@@ -230,9 +230,9 @@ class KotlinClasspathProvider {
         if (dir.exists() && dir.isDirectory) {
           classpaths.add(dir.absolutePath)
           addedCount++
-          log.info("✓ Added generated source: {}", path)
+          KslLogs.info("✓ Added generated source: {}", path)
         } else {
-          log.debug("✗ Not found: {}", path)
+          KslLogs.debug("✗ Not found: {}", path)
         }
       }
 
@@ -250,16 +250,16 @@ class KotlinClasspathProvider {
         if (javacDir.exists()) {
           classpaths.add(javacDir.absolutePath)
           addedCount++
-          log.info("✓ Added javac classes: {}", javacDir.absolutePath)
+          KslLogs.info("✓ Added javac classes: {}", javacDir.absolutePath)
         }
 
         // Add compiled classes from other tasks
         findCompiledClassDirectories(intermediatesDir, classpaths)
       }
 
-      log.info("Added {} generated source paths for module: {}", addedCount, module.path)
+      KslLogs.info("Added {} generated source paths for module: {}", addedCount, module.path)
     } catch (e: Exception) {
-      log.error("Failed to add Android-generated sources for module: {}", module.path, e)
+      KslLogs.error("Failed to add Android-generated sources for module: {}", module.path, e)
     }
   }
 
@@ -280,7 +280,7 @@ class KotlinClasspathProvider {
           )
 
       val kotlinVersion = getKotlinVersionFromProject()
-      log.info("Looking for Kotlin scripting JARs (version: {})", kotlinVersion ?: "any")
+      KslLogs.info("Looking for Kotlin scripting JARs (version: {})", kotlinVersion ?: "any")
 
       val scriptingArtifacts =
           listOf(
@@ -297,11 +297,11 @@ class KotlinClasspathProvider {
 
         val modulesCache = File(gradleHome, "caches/modules-2/files-2.1/org.jetbrains.kotlin")
         if (!modulesCache.exists()) {
-          log.debug("Gradle cache not found at: {}", modulesCache.absolutePath)
+          KslLogs.debug("Gradle cache not found at: {}", modulesCache.absolutePath)
           continue
         }
 
-        log.info("Scanning Gradle cache: {}", modulesCache.absolutePath)
+        KslLogs.info("Scanning Gradle cache: {}", modulesCache.absolutePath)
 
         scriptingArtifacts.forEach { artifactName ->
           val artifactDir = File(modulesCache, artifactName)
@@ -333,7 +333,7 @@ class KotlinClasspathProvider {
 
                       classpaths.add(file.absolutePath)
                       foundCount++
-                      log.info("✓ Added Kotlin scripting JAR: {}", file.name)
+                      KslLogs.info("✓ Added Kotlin scripting JAR: {}", file.name)
                     }
                   }
                 }
@@ -344,20 +344,20 @@ class KotlinClasspathProvider {
 
         // If we found JARs in this Gradle home, no need to check others
         if (foundCount > 0) {
-          log.info("Found {} Kotlin scripting JARs in Gradle cache", foundCount)
+          KslLogs.info("Found {} Kotlin scripting JARs in Gradle cache", foundCount)
           break
         }
       }
 
       if (foundCount == 0) {
-        log.warn("⚠ No Kotlin scripting JARs found in Gradle cache!")
-        log.warn("⚠ This might happen if:")
-        log.warn("⚠   1. Gradle hasn't been run yet (run a build first)")
-        log.warn("⚠   2. Using a custom Gradle installation")
-        log.warn("⚠   3. Gradle cache was cleared")
+        KslLogs.warn("⚠ No Kotlin scripting JARs found in Gradle cache!")
+        KslLogs.warn("⚠ This might happen if:")
+        KslLogs.warn("⚠   1. Gradle hasn't been run yet (run a build first)")
+        KslLogs.warn("⚠   2. Using a custom Gradle installation")
+        KslLogs.warn("⚠   3. Gradle cache was cleared")
       }
     } catch (e: Exception) {
-      log.error("Failed to add Kotlin scripting JARs from Gradle cache", e)
+      KslLogs.error("Failed to add Kotlin scripting JARs from Gradle cache", e)
     }
   }
 
@@ -379,7 +379,7 @@ class KotlinClasspathProvider {
         val match = versionRegex.find(content)
         if (match != null) {
           val version = match.groupValues[1]
-          log.info("Detected Kotlin version from build.gradle.kts: {}", version)
+          KslLogs.info("Detected Kotlin version from build.gradle.kts: {}", version)
           return version
         }
 
@@ -388,7 +388,7 @@ class KotlinClasspathProvider {
         val altMatch = altRegex.find(content)
         if (altMatch != null) {
           val version = altMatch.groupValues[1]
-          log.info("Detected Kotlin version: {}", version)
+          KslLogs.info("Detected Kotlin version: {}", version)
           return version
         }
       }
@@ -400,12 +400,12 @@ class KotlinClasspathProvider {
         propertiesFile.inputStream().use { props.load(it) }
         val version = props.getProperty("kotlin.version") ?: props.getProperty("kotlinVersion")
         if (version != null) {
-          log.info("Detected Kotlin version from gradle.properties: {}", version)
+          KslLogs.info("Detected Kotlin version from gradle.properties: {}", version)
           return version
         }
       }
     } catch (e: Exception) {
-      log.debug("Could not detect Kotlin version", e)
+      KslLogs.debug("Could not detect Kotlin version", e)
     }
 
     return null
@@ -454,7 +454,7 @@ class KotlinClasspathProvider {
                       file.name.contains("kotlin-scripting")
               ) {
                 foundScriptRuntime = true
-                log.info("✓ Found Kotlin script JAR: {}", file.name)
+                KslLogs.info("✓ Found Kotlin script JAR: {}", file.name)
               }
             }
           }
@@ -462,12 +462,12 @@ class KotlinClasspathProvider {
       }
 
       if (!foundScriptRuntime) {
-        log.warn("⚠ kotlin-script-runtime NOT found in build artifacts!")
-        log.warn("⚠ Make sure your build.gradle.kts includes:")
-        log.warn("⚠   implementation(\"org.jetbrains.kotlin:kotlin-script-runtime:<version>\")")
+        KslLogs.warn("⚠ kotlin-script-runtime NOT found in build artifacts!")
+        KslLogs.warn("⚠ Make sure your build.gradle.kts includes:")
+        KslLogs.warn("⚠   implementation(\"org.jetbrains.kotlin:kotlin-script-runtime:<version>\")")
       }
     } catch (e: Exception) {
-      log.error("Failed to add external library JARs", e)
+      KslLogs.error("Failed to add external library JARs", e)
     }
   }
 
@@ -484,7 +484,7 @@ class KotlinClasspathProvider {
 
       if (hasSourceFiles && !classpaths.contains(dir.absolutePath)) {
         classpaths.add(dir.absolutePath)
-        log.debug("Discovered source directory: {}", dir.absolutePath)
+        KslLogs.debug("Discovered source directory: {}", dir.absolutePath)
       }
 
       // Recurse into subdirectories
@@ -492,7 +492,7 @@ class KotlinClasspathProvider {
           .filter { it.isDirectory }
           .forEach { subDir -> scanForSourceDirectories(subDir, classpaths, maxDepth - 1) }
     } catch (e: Exception) {
-      log.debug("Error scanning directory: {}", dir.absolutePath, e)
+      KslLogs.debug("Error scanning directory: {}", dir.absolutePath, e)
     }
   }
 
@@ -512,11 +512,11 @@ class KotlinClasspathProvider {
         val dir = File(intermediatesDir, path)
         if (dir.exists()) {
           classpaths.add(dir.absolutePath)
-          log.info("✓ Added compiled classes: {}", path)
+          KslLogs.info("✓ Added compiled classes: {}", path)
         }
       }
     } catch (e: Exception) {
-      log.debug("Error finding compiled class directories", e)
+      KslLogs.debug("Error finding compiled class directories", e)
     }
   }
 
@@ -530,7 +530,7 @@ class KotlinClasspathProvider {
             androidJar?.parentFile?.parentFile?.parentFile?.absolutePath
           }
         } catch (e: Exception) {
-          log.error("Failed to get Android SDK path from compiler service", e)
+          KslLogs.error("Failed to get Android SDK path from compiler service", e)
           null
         }
 
@@ -562,7 +562,7 @@ class KotlinClasspathProvider {
       }
       ""
     } catch (e: Exception) {
-      log.error("Failed to get Android SDK path from project system", e)
+      KslLogs.error("Failed to get Android SDK path from project system", e)
       ""
     }
   }
@@ -573,7 +573,7 @@ class KotlinClasspathProvider {
     return try {
       classpathReader.listClasses(classpathFiles).toSet()
     } catch (e: Exception) {
-      log.error("Failed to list classes in classpath", e)
+      KslLogs.error("Failed to list classes in classpath", e)
       emptySet()
     }
   }
@@ -592,7 +592,7 @@ class KotlinClasspathProvider {
       }
       classpaths
     } catch (e: Exception) {
-      log.error("Failed to get module classpath for project: $projectPath", e)
+      KslLogs.error("Failed to get module classpath for project: $projectPath", e)
       emptyList()
     }
   }
@@ -618,7 +618,7 @@ class KotlinClasspathProvider {
 
       sourceDirs.toList()
     } catch (e: Exception) {
-      log.error("Failed to get source directories", e)
+      KslLogs.error("Failed to get source directories", e)
       emptyList()
     }
   }
@@ -627,6 +627,6 @@ class KotlinClasspathProvider {
   fun invalidateCache() {
     cachedClasspathList = null
     cachedClasspath = null
-    log.info("Classpath cache invalidated")
+    KslLogs.info("Classpath cache invalidated")
   }
 }

@@ -64,7 +64,6 @@ class TerminalActivity : TermuxActivity() {
     controller.isAppearanceLightNavigationBars = false
     controller.isAppearanceLightStatusBars = false
     super.onCreate(savedInstanceState)
-
     canAddNewSessions = savedInstanceState?.getBoolean(KEY_TERMINAL_CAN_ADD_SESSIONS, true) ?: true
   }
 

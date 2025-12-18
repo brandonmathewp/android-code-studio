@@ -1,19 +1,19 @@
 /*
- *  This file is part of AndroidIDE.
+ *  This file is part of AndroidCodeStudio.
  *
- *  AndroidIDE is free software: you can redistribute it and/or modify
+ *  AndroidCodeStudio is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  (at your option) any later version.
  *
- *  AndroidIDE is distributed in the hope that it will be useful,
+ *  AndroidCodeStudio is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *   along with AndroidIDE.  If not, see <https://www.gnu.org/licenses/>.
- */
+ *   along with AndroidCodeStudio.  If not, see <https://www.gnu.org/licenses/>.
+*/
 
 package com.tom.rv2ide.activities
 
@@ -45,12 +45,10 @@ import com.tom.rv2ide.projects.IProjectManager
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * Activity for the Asset Studio - Image Icon Generator. Generates app icons from images with
- * customizable backgrounds and shapes.
- *
- * @author Tom
- */
+/*
+ * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
+*/
+
 class AssetStudioActivity : EdgeToEdgeIDEActivity() {
 
   private var _binding: ActivityAssetStudioBinding? = null
@@ -142,16 +140,16 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
 
   private fun setupUI() {
     binding.apply {
-      // Set up toolbar
+      
       toolbar.setNavigationOnClickListener { finish() }
 
-      // Set up image selection
+      
       selectImageButton.setOnClickListener { selectImage() }
 
-      // Set up XML selection
+      
       selectXmlButton.setOnClickListener { selectXmlFile() }
 
-      // Set up icon shape selection using ChipGroup
+      
       shapeChipGroup.setOnCheckedStateChangeListener { group, checkedIds ->
         when (checkedIds.firstOrNull()) {
           R.id.circle_shape_button -> updateIconShape(IconShape.CIRCLE)
@@ -160,22 +158,22 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
         }
       }
 
-      // Set up color picker
+      
       colorPickerButton.setOnClickListener { showColorPickerDialog() }
 
       customColorButton.setOnClickListener { showCustomColorDialog() }
 
-      // Set up color presets
+      
       setupColorPresets()
 
-      // Set up sliders
+      
       foregroundScaleSlider.addOnChangeListener { _, value, _ ->
         updateForegroundScale(value / 100f)
       }
 
       roundedCornersSlider.addOnChangeListener { _, value, _ -> updateRoundedCorners(value / 100f) }
 
-      // Set up generation controls
+      
       generateButton.setOnClickListener { generateImageAssets() }
 
       previewButton.setOnClickListener { showPreviewDialog() }
@@ -196,15 +194,15 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
     xmlPickerLauncher.launch(intent)
   }
 
-  // Replace the loadVectorDrawableFromXml function with this improved version:
+  
 
   private fun loadVectorDrawableFromXml(xmlContent: String): Drawable? {
     return try {
-      // Create a temporary file in the cache directory
+      
       val tempFile = File.createTempFile("temp_vector", ".xml", cacheDir)
       tempFile.writeText(xmlContent)
 
-      // Create a temporary resource directory structure
+      
       val tempResDir = File(cacheDir, "temp_res")
       val tempDrawableDir = File(tempResDir, "drawable")
       tempDrawableDir.mkdirs()
@@ -213,24 +211,24 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       tempVectorFile.writeText(xmlContent)
 
       try {
-        // Method 1: Try to inflate using the system inflater
+        
         val parser = resources.assets.openXmlResourceParser("drawable/temp_vector.xml")
         val drawable = Drawable.createFromXml(resources, parser)
         parser.close()
 
         if (drawable != null) {
           drawable.setBounds(0, 0, 512, 512)
-          // Don't set tint here - preserve original colors
+          
           tempFile.delete()
           tempResDir.deleteRecursively()
           return drawable
         }
       } catch (e: Exception) {
-        // Method 1 failed, try Method 2
+        
       }
 
       try {
-        // Method 2: Parse XML manually and create VectorDrawable programmatically
+        
         val drawable = parseVectorDrawableXml(xmlContent)
         if (drawable != null) {
           tempFile.delete()
@@ -238,17 +236,17 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
           return drawable
         }
       } catch (e: Exception) {
-        // Method 2 failed, try Method 3
+        
       }
 
       try {
-        // Method 3: Create bitmap from XML content using XmlPullParser
+        
         val drawable = createVectorDrawableFromXmlContent(xmlContent)
         tempFile.delete()
         tempResDir.deleteRecursively()
         return drawable
       } catch (e: Exception) {
-        // All methods failed, clean up and return placeholder
+        
         tempFile.delete()
         tempResDir.deleteRecursively()
         return createPlaceholderDrawable()
@@ -264,22 +262,22 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       parser.setFeature(org.xmlpull.v1.XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
       parser.setInput(xmlContent.byteInputStream(), "UTF-8")
 
-      // Find the vector element
+      
       var eventType = parser.eventType
       while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
         if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "vector") {
-          // Found vector element, try to create VectorDrawable
+          
           val drawable = VectorDrawable()
 
-          // Set basic properties
+          
           drawable.setBounds(0, 0, 512, 512)
 
-          // Try to inflate from the parser position
+          
           try {
             drawable.inflate(resources, parser, android.util.Xml.asAttributeSet(parser))
             return drawable
           } catch (e: Exception) {
-            // Inflation failed, continue to next method
+            
             break
           }
         }
@@ -294,11 +292,11 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
 
   private fun createVectorDrawableFromXmlContent(xmlContent: String): Drawable? {
     return try {
-      // Create a bitmap and draw the vector content onto it
+      
       val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
       val canvas = Canvas(bitmap)
 
-      // Parse the XML to extract basic vector information
+      
       val parser = android.util.Xml.newPullParser()
       parser.setInput(xmlContent.byteInputStream(), "UTF-8")
 
@@ -314,7 +312,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
           org.xmlpull.v1.XmlPullParser.START_TAG -> {
             when (parser.name) {
               "vector" -> {
-                // Parse vector attributes
+                
                 for (i in 0 until parser.attributeCount) {
                   when (parser.getAttributeName(i)) {
                     "width" -> width = parseDimension(parser.getAttributeValue(i))
@@ -327,7 +325,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
                 }
               }
               "path" -> {
-                // Parse path attributes
+                
                 var pathData = ""
                 var fillColor = Color.BLACK
                 var strokeColor = Color.TRANSPARENT
@@ -352,7 +350,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
         eventType = parser.next()
       }
 
-      // Draw the vector paths onto the bitmap
+      
       canvas.drawColor(Color.TRANSPARENT)
 
       val scaleX = 512f / viewportWidth
@@ -370,7 +368,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
               androidx.core.graphics.PathParser.createPathFromPathData(vectorPath.pathData)
           path.set(pathParser)
 
-          // Draw fill
+          
           if (vectorPath.fillColor != Color.TRANSPARENT) {
             val fillPaint =
                 Paint().apply {
@@ -381,7 +379,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
             canvas.drawPath(path, fillPaint)
           }
 
-          // Draw stroke
+          
           if (vectorPath.strokeColor != Color.TRANSPARENT && vectorPath.strokeWidth > 0) {
             val strokePaint =
                 Paint().apply {
@@ -393,7 +391,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
             canvas.drawPath(path, strokePaint)
           }
         } catch (e: Exception) {
-          // Skip this path if parsing fails
+          
         }
       }
 
@@ -421,7 +419,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       when {
         colorString.startsWith("#") -> Color.parseColor(colorString)
         colorString.startsWith("@") -> {
-          // This is a resource reference, use a default color
+          
           Color.BLACK
         }
         else -> Color.parseColor("#$colorString")
@@ -438,7 +436,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       val strokeWidth: Float,
   )
 
-  // Also update the createPlaceholderDrawable function to be more informative:
+  
   private fun createPlaceholderDrawable(): Drawable {
     val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
@@ -448,24 +446,24 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
           textAlign = Paint.Align.CENTER
         }
 
-    // Background
+    
     paint.color = Color.parseColor("#F5F5F5")
     paint.style = Paint.Style.FILL
     canvas.drawRect(0f, 0f, 512f, 512f, paint)
 
-    // Border
+    
     paint.color = Color.parseColor("#CCCCCC")
     paint.style = Paint.Style.STROKE
     paint.strokeWidth = 4f
     canvas.drawRect(2f, 2f, 510f, 510f, paint)
 
-    // Icon
+    
     paint.color = Color.parseColor("#666666")
     paint.style = Paint.Style.FILL
     paint.textSize = 48f
     canvas.drawText("XML", 256f, 240f, paint)
 
-    // Subtitle
+    
     paint.textSize = 24f
     paint.color = Color.parseColor("#999999")
     canvas.drawText("Vector Drawable", 256f, 280f, paint)
@@ -475,7 +473,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
 
   private fun updatePreview() {
     if (isXmlMode && selectedXmlDrawable != null) {
-      // For XML drawables, display directly as VectorDrawable
+      
       binding.previewImageView.setImageDrawable(selectedXmlDrawable)
     } else {
       selectedImage?.let { bitmap ->
@@ -490,16 +488,16 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
       val canvas = Canvas(bitmap)
 
-      // Clear the canvas with transparent background
+      
       canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
 
-      // Set bounds and draw the drawable
+      
       drawable.setBounds(0, 0, 512, 512)
       drawable.draw(canvas)
 
       bitmap
     } catch (e: Exception) {
-      // Create a fallback bitmap
+      
       val fallbackBitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
       val canvas = Canvas(fallbackBitmap)
       val paint =
@@ -516,11 +514,11 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
   }
 
   private fun applyImageTransformations(originalBitmap: Bitmap): Bitmap {
-    val size = 512 // High resolution for better quality
+    val size = 512 
     val result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(result)
 
-    // Draw background with proper shape
+    
     val backgroundPaint =
         Paint().apply {
           color = currentBackgroundColor
@@ -548,14 +546,14 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       }
     }
 
-    // Draw foreground image with scaling
+    
     val foregroundSize = (size * currentForegroundScale).toInt()
     val scaledBitmap =
         Bitmap.createScaledBitmap(originalBitmap, foregroundSize, foregroundSize, true)
     val left = (size - foregroundSize) / 2f
     val top = (size - foregroundSize) / 2f
 
-    // Apply shape mask to foreground
+    
     val maskBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val maskCanvas = Canvas(maskBitmap)
     val maskPaint =
@@ -585,7 +583,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       }
     }
 
-    // Apply mask to foreground
+    
     val maskedBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val maskedCanvas = Canvas(maskedBitmap)
     val maskedPaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
@@ -593,7 +591,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
     maskedCanvas.drawBitmap(scaledBitmap, left, top, null)
     maskedCanvas.drawBitmap(maskBitmap, 0f, 0f, maskedPaint)
 
-    // Draw the masked foreground onto the background
+    
     canvas.drawBitmap(maskedBitmap, 0f, 0f, null)
 
     return result
@@ -631,12 +629,12 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
     val dialogBinding = DialogColorPickerBinding.inflate(layoutInflater)
     val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
 
-    // Set up current color
+    
     dialogBinding.currentColorPreview.setBackgroundColor(currentBackgroundColor)
     dialogBinding.currentColorHex.text = String.format("#%08X", currentBackgroundColor)
     dialogBinding.hexColorInput.setText(String.format("#%08X", currentBackgroundColor))
 
-    // Set up color presets
+    
     val colorPresets = ColorPresetAdapter.getDefaultColors()
     val adapter =
         ColorPresetAdapter(colorPresets) { color ->
@@ -650,7 +648,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
         LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
     dialogBinding.colorPresetsRecycler.adapter = adapter
 
-    // Set up hex input
+    
     dialogBinding.hexColorInput.addTextChangedListener(
         object : TextWatcher {
           override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -664,13 +662,13 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
               dialogBinding.currentColorPreview.setBackgroundColor(color)
               dialogBinding.currentColorHex.text = String.format("#%08X", color)
             } catch (e: Exception) {
-              // Invalid color format, ignore
+              
             }
           }
         }
     )
 
-    // Set up buttons
+    
     dialogBinding.cancelColorButton.setOnClickListener { dialog.dismiss() }
 
     dialogBinding.applyColorButton.setOnClickListener {
@@ -685,12 +683,12 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
     val dialogBinding = DialogColorPickerBinding.inflate(layoutInflater)
     val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
 
-    // Set up current color
+    
     dialogBinding.currentColorPreview.setBackgroundColor(currentBackgroundColor)
     dialogBinding.currentColorHex.text = String.format("#%08X", currentBackgroundColor)
     dialogBinding.hexColorInput.setText(String.format("#%08X", currentBackgroundColor))
 
-    // Set up color presets
+    
     val colorPresets = ColorPresetAdapter.getDefaultColors()
     val adapter =
         ColorPresetAdapter(colorPresets) { color ->
@@ -704,7 +702,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
         LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
     dialogBinding.colorPresetsRecycler.adapter = adapter
 
-    // Set up hex input
+    
     dialogBinding.hexColorInput.addTextChangedListener(
         object : TextWatcher {
           override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -718,13 +716,13 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
               dialogBinding.currentColorPreview.setBackgroundColor(color)
               dialogBinding.currentColorHex.text = String.format("#%08X", color)
             } catch (e: Exception) {
-              // Invalid color format, ignore
+              
             }
           }
         }
     )
 
-    // Set up buttons
+    
     dialogBinding.cancelColorButton.setOnClickListener { dialog.dismiss() }
 
     dialogBinding.applyColorButton.setOnClickListener {
@@ -741,7 +739,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
 
     binding.colorPresetsContainer.removeAllViews()
 
-    // Add color preset buttons directly to the container
+    
     colorPresets.forEach { color ->
       val button =
           com.google.android.material.button.MaterialButton(this).apply {
@@ -762,7 +760,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
     val result = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(result)
 
-    // Draw background
+    
     val backgroundPaint =
         Paint().apply {
           color = currentBackgroundColor
@@ -790,14 +788,14 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       }
     }
 
-    // Draw foreground image with scaling
+    
     val foregroundSize = (size * currentForegroundScale).toInt()
     val scaledBitmap =
         Bitmap.createScaledBitmap(originalBitmap, foregroundSize, foregroundSize, true)
     val left = (size - foregroundSize) / 2f
     val top = (size - foregroundSize) / 2f
 
-    // Apply shape mask to foreground
+    
     val maskBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val maskCanvas = Canvas(maskBitmap)
     val maskPaint =
@@ -827,7 +825,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       }
     }
 
-    // Apply mask to foreground
+    
     val maskedBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val maskedCanvas = Canvas(maskedBitmap)
     val maskedPaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) }
@@ -835,7 +833,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
     maskedCanvas.drawBitmap(scaledBitmap, left, top, null)
     maskedCanvas.drawBitmap(maskBitmap, 0f, 0f, maskedPaint)
 
-    // Draw the masked foreground onto the background
+    
     canvas.drawBitmap(maskedBitmap, 0f, 0f, null)
 
     return result
@@ -843,7 +841,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
 
   private fun showPreviewDialog() {
     if (isXmlMode && selectedXmlDrawable != null) {
-      // For XML drawables, show directly
+      
       binding.previewImageView.setImageDrawable(selectedXmlDrawable)
       Toast.makeText(this, "XML Preview updated", Toast.LENGTH_SHORT).show()
     } else {
@@ -890,8 +888,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
         .setTitle("Material Icons")
         .setItems(options) { dialog, which ->
           when (which) {
-            0 -> materialIconsLauncher.launch(Intent(this, MaterialIconsWebActivity::class.java))
-            1 -> {
+            0 -> {
               showPasteXmlDialog()
             }
           }
@@ -971,7 +968,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
 
       var generatedCount = 0
 
-      // Main base asset
+      
       val mainFinalIcon = createFinalIcon(sourceBitmap, 96)
       val mainIconFile = java.io.File(baseDir, "$iconName.png")
       java.io.FileOutputStream(mainIconFile).use { out ->
@@ -979,7 +976,7 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
       }
       generatedCount++
 
-      // Density-specific assets
+      
       densities.forEach { (density, size) ->
         val densityDir = java.io.File(resDir, "$base-$density")
         densityDir.mkdirs()
@@ -998,7 +995,6 @@ class AssetStudioActivity : EdgeToEdgeIDEActivity() {
     }
   }
 
-  // Updated to prompt for save location
   private fun generateImageAssets() {
     val iconName = binding.iconNameInput.text.toString().ifEmpty { "ic_my_icon" }
     val sourceBitmap =

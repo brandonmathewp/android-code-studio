@@ -27,7 +27,6 @@ import android.provider.Settings
 import android.util.Log
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
@@ -69,26 +68,9 @@ class TomIDEUpdater(private val context: Context) {
         if (updateInfo != null && isUpdateAvailable(updateInfo)) {
           val changelog = fetchChangelog(updateInfo.changelogUrl)
           withContext(Dispatchers.Main) { showUpdateDialog(updateInfo, changelog) }
-        } else {
-          withContext(Dispatchers.Main) {
-            Toast.makeText(
-                    context,
-                    context.getString(R.string.updater_no_updates_available),
-                    Toast.LENGTH_SHORT,
-                )
-                .show()
-          }
         }
       } catch (e: Exception) {
         Log.e(TAG, "Error checking for updates", e)
-        withContext(Dispatchers.Main) {
-          Toast.makeText(
-                  context,
-                  context.getString(R.string.updater_check_failed),
-                  Toast.LENGTH_SHORT,
-              )
-              .show()
-        }
       }
     }
   }
@@ -310,12 +292,6 @@ class TomIDEUpdater(private val context: Context) {
     val availableVariant = getVariantForCurrentArchitecture(updateInfo)
 
     if (availableVariant == null) {
-      Toast.makeText(
-              context,
-              context.getString(R.string.updater_no_compatible_update),
-              Toast.LENGTH_LONG,
-          )
-          .show()
       return
     }
 
@@ -368,25 +344,12 @@ class TomIDEUpdater(private val context: Context) {
               hideProgressDialog()
               if (apkFile != null) {
                 installApk(apkFile)
-              } else {
-                Toast.makeText(
-                        context,
-                        context.getString(R.string.updater_download_failed),
-                        Toast.LENGTH_SHORT,
-                    )
-                    .show()
               }
             }
           } catch (e: Exception) {
             Log.e(TAG, context.getString(R.string.updater_download_error), e)
             withContext(Dispatchers.Main) {
               hideProgressDialog()
-              Toast.makeText(
-                      context,
-                      context.getString(R.string.updater_download_failed_with_error, e.message),
-                      Toast.LENGTH_SHORT,
-                  )
-                  .show()
             }
           }
         }
@@ -464,12 +427,6 @@ class TomIDEUpdater(private val context: Context) {
       context.startActivity(intent)
     } catch (e: Exception) {
       Log.e(TAG, context.getString(R.string.updater_install_error), e)
-      Toast.makeText(
-              context,
-              context.getString(R.string.updater_installation_failed),
-              Toast.LENGTH_SHORT,
-          )
-          .show()
     }
   }
 
@@ -493,12 +450,6 @@ class TomIDEUpdater(private val context: Context) {
         context.startActivity(intent)
       }
 
-      Toast.makeText(
-              context,
-              context.getString(R.string.updater_enable_install_permission),
-              Toast.LENGTH_LONG,
-          )
-          .show()
     }
   }
 
@@ -564,12 +515,6 @@ class TomIDEUpdater(private val context: Context) {
       context.startActivity(intent)
     } catch (e: Exception) {
       Log.e(TAG, context.getString(R.string.updater_browser_error), e)
-      Toast.makeText(
-              context,
-              context.getString(R.string.updater_cannot_open_browser),
-              Toast.LENGTH_SHORT,
-          )
-          .show()
     }
   }
 

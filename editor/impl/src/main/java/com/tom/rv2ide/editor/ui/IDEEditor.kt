@@ -17,7 +17,6 @@
 
 package com.tom.rv2ide.editor.ui
 
-// import com.tom.rv2ide.editor.language.cpp.CppLanguage
 import android.content.Context
 import android.graphics.Rect
 import android.os.Bundle
@@ -198,15 +197,20 @@ constructor(
 
     /** Create input type flags for the editor. */
     fun createInputTypeFlags(): Int {
-      var flags =
-          EditorInfo.TYPE_CLASS_TEXT or
-              EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE or
-              EditorInfo.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-      if (EditorPreferences.visiblePasswordFlag) {
-        flags = flags or EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+      if (EditorPreferences.keyboardSuggestions) {
+        return EditorInfo.TYPE_CLASS_TEXT or EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE
+      } else {
+        var flags =
+            EditorInfo.TYPE_CLASS_TEXT or
+                EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE or
+                EditorInfo.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        if (EditorPreferences.visiblePasswordFlag) {
+          flags = flags or EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        }
+        return flags
       }
-      return flags
     }
+    
   }
 
   init {
@@ -435,14 +439,18 @@ constructor(
     selectionChangeRunner?.also { selectionChangeHandler.removeCallbacks(it) }
     selectionChangeRunner = null
 
-    if (EventBus.getDefault().isRegistered(this)) {
-      EventBus.getDefault().unregister(this)
-    }
-
     setupTsLanguageJob?.cancel("Editor is releasing resources.")
 
     if (editorScope.isActive) {
       editorScope.cancelIfActive("Editor is releasing resources.")
+    }
+    
+    try {
+      if (EventBus.getDefault().isRegistered(this)) {
+        EventBus.getDefault().unregister(this)
+      }
+    } catch (e: Exception) {
+      log.debug("EventBus unregister failed", e)
     }
   }
 
@@ -686,7 +694,9 @@ constructor(
     searcher = IDEEditorSearcher(this)
     colorScheme = SchemeAndroidIDE.newInstance(context)
     inputType = createInputTypeFlags()
-
+    val backgroundColor = getSystemBackgroundColor()
+    setBackgroundColor(backgroundColor)
+    
     val window = EditorCompletionWindow(this)
     window.setAdapter(CompletionListAdapter())
     replaceComponent(EditorAutoCompletion::class.java, window)
@@ -723,6 +733,37 @@ constructor(
     }
 
     EventBus.getDefault().register(this)
+  }
+
+  private fun isSystemInDarkMode(): Boolean {
+      val nightModeFlags = context.resources.configuration.uiMode and 
+              android.content.res.Configuration.UI_MODE_NIGHT_MASK
+      return nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES
+  }
+  
+  private fun getSystemBackgroundColor(): Int {
+      val typedValue = android.util.TypedValue()
+      val theme = context.theme
+      
+      // Try to get the background color from Material3 attributes
+      return when {
+          // Material 3 background
+          theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true) -> {
+              typedValue.data
+          }
+          // Fallback to Material 2 background
+          theme.resolveAttribute(com.google.android.material.R.attr.backgroundColor, typedValue, true) -> {
+              typedValue.data
+          }
+          // Android system background
+          theme.resolveAttribute(android.R.attr.colorBackground, typedValue, true) -> {
+              typedValue.data
+          }
+          // Ultimate fallback
+          else -> {
+              if (isSystemInDarkMode()) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt()
+          }
+      }
   }
 
   private inline fun launchCancellableAsyncWithProgress(

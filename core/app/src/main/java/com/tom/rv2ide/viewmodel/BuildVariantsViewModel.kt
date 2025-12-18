@@ -21,11 +21,6 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.tom.rv2ide.tooling.api.models.BuildVariantInfo
 
-/**
- * [ViewModel] for the build variants fragment.
- *
- * @author Akash Yadav
- */
 class BuildVariantsViewModel : ViewModel() {
 
   internal val _buildVariants = MutableLiveData<Map<String, BuildVariantInfo>>(null)
@@ -43,8 +38,17 @@ class BuildVariantsViewModel : ViewModel() {
       this._updatedBuildVariants.value = value
     }
 
-  /** Resets the updated selections. */
   internal fun resetUpdatedSelections() {
     updatedBuildVariants = updatedBuildVariants.also { it.clear() }
+  }
+
+  fun updateModuleConfig(projectPath: String, updatedInfo: BuildVariantInfo) {
+    buildVariants = buildVariants.toMutableMap().apply {
+      put(projectPath, updatedInfo)
+    }
+    
+    updatedBuildVariants = updatedBuildVariants.also {
+      it[projectPath] = updatedInfo
+    }
   }
 }

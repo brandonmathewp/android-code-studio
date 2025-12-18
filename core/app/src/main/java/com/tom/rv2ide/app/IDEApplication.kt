@@ -62,6 +62,8 @@ import com.tom.rv2ide.utils.MemoryManager
 import com.tom.rv2ide.utils.RecyclableObjectPool
 import com.tom.rv2ide.utils.VMUtils
 import com.tom.rv2ide.utils.flashError
+import com.tom.rv2ide.utils.MemoryProfiler
+import io.github.mohammedbaqernull.seasonal.SeasonalEffects
 import io.github.miyazkaori.silentinstaller.SilentInstaller
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 import java.io.File
@@ -83,6 +85,7 @@ class IDEApplication : TermuxApplication() {
   private var ideLogcatReader: IDELogcatReader? = null
   private var memoryManager: MemoryManager? = null
   private var chartCleanupTask: ChartMemoryCleanupTask? = null
+  private var memoryProfiler: MemoryProfiler? = null
 
   init {
     RecyclableObjectPool.DEBUG = BuildConfig.DEBUG
@@ -92,7 +95,6 @@ class IDEApplication : TermuxApplication() {
     super.attachBaseContext(base)
 
     SilentInstaller.init(this)
-
     // Load native libraries after base context is attached
     TreeSitter.loadLibrary()
     if (!VMUtils.isJvm()) {
@@ -110,6 +112,12 @@ class IDEApplication : TermuxApplication() {
 
     super.onCreate()
 
+    if (GeneralPreferences.snowfallOverlay && isSnowfallSeasonActive()) {
+      SeasonalEffects.init(this)
+      SeasonalEffects.enableChristmas()
+      SeasonalEffects.setSnowflakeCount(20)
+    }
+
     if (BuildConfig.DEBUG) {
       StrictMode.setVmPolicy(
           StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy()).penaltyLog().detectAll().build()
@@ -117,6 +125,7 @@ class IDEApplication : TermuxApplication() {
       if (DevOpsPreferences.dumpLogs) {
         startLogcatReader()
       }
+      // initializeMemoryProfiler()
     }
 
     EventBus.builder()
@@ -140,14 +149,24 @@ class IDEApplication : TermuxApplication() {
     GlobalScope.launch { IDEColorSchemeProvider.init() }
 
     // Initialize memory management
-    initializeMemoryManagement()
+    // initializeMemoryManagement()
     extractLoggerRuntime()
+    extractJetbrainsMono()
 
-    // initializeKotlinServer()
     // DISABLED: Plugin system completely disabled to prevent Tooling API issues
     // initializePluginSystem()
   }
 
+  /**
+   * Check if the snowfall season is currently active.
+   * Snowfall is active until January 5, 2026.
+   */
+  private fun isSnowfallSeasonActive(): Boolean {
+    val currentDate = java.time.LocalDate.now()
+    val endDate = java.time.LocalDate.of(2026, 1, 5)
+    return currentDate.isBefore(endDate) || currentDate.isEqual(endDate)
+  }
+  
   fun showChangelog() {
     val intent = Intent(Intent.ACTION_VIEW)
     var version = BuildInfo.VERSION_NAME_SIMPLE
@@ -219,6 +238,23 @@ class IDEApplication : TermuxApplication() {
     }
   }
 
+  private fun extractJetbrainsMono() {
+    try {
+      val fontsDir = File(Environment.HOME, ".androidide/ui")
+
+      if (!fontsDir.exists()) {
+        fontsDir.mkdirs()
+      }
+      val targetFont = File(fontsDir, "jetbrains-mono.ttf")
+
+      assets.open("fonts/jetbrains-mono.ttf").use { input ->
+        FileOutputStream(targetFont).use { output -> input.copyTo(output) }
+      }
+    } catch (e: Exception) {
+      log.error("Failed to extract jetbrains-mono.ttf font", e)
+    }
+  }
+  
   private fun extractLoggerRuntime() {
     try {
       val pluginsDir = File(Environment.HOME, "plugins/logger")
@@ -318,6 +354,19 @@ class IDEApplication : TermuxApplication() {
     return memoryManager
   }
 
+  private fun initializeMemoryProfiler() {
+    try {
+      memoryProfiler = MemoryProfiler.getInstance(this)
+      memoryProfiler?.startMonitoring()
+      Log.i("IDEApplication", "Memory profiler initialized and started")
+    } catch (e: Exception) {
+      Log.e("IDEApplication", "Failed to initialize memory profiler", e)
+    }
+  }
+
+  fun getMemoryProfiler(): MemoryProfiler? {
+    return memoryProfiler
+  }
   companion object {
 
     private val log = LoggerFactory.getLogger(IDEApplication::class.java)

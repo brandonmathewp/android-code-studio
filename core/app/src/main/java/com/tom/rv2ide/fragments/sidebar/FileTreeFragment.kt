@@ -17,6 +17,7 @@
 package com.tom.rv2ide.fragments.sidebar
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.LayoutInflater
@@ -52,6 +53,8 @@ import java.util.Arrays
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode.MAIN
+import com.tom.rv2ide.activities.FileBrowserActivity
+import com.tom.rv2ide.fragments.sidebar.utils.FileTree.DialogProjectSettings
 
 class FileTreeFragment :
     BottomSheetDialogFragment(), TreeNodeClickListener, TreeNodeLongClickListener {
@@ -80,6 +83,16 @@ class FileTreeFragment :
   override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
     super.onViewCreated(view, savedInstanceState)
     listProjectFiles()
+    
+    binding?.fileTreeLabel?.text = File(IProjectManager.getInstance().projectDirPath).name.toString()
+    
+    binding?.folderBrowser?.setOnClickListener {
+        val intent = Intent(requireContext(), FileBrowserActivity::class.java)
+        startActivity(intent)
+    }
+    binding?.projectSettings?.setOnClickListener {
+        DialogProjectSettings(requireContext()).show()
+    }
   }
 
   override fun onDestroyView() {
@@ -92,6 +105,11 @@ class FileTreeFragment :
     fileTreeView = null
   }
 
+  override fun onDestroy() {
+      super.onDestroy()
+      com.tom.rv2ide.utils.EditorSidebarActions.removeFragmentFromCache("ide.editor.sidebar.fileTree")
+  }
+  
   fun saveTreeState() {
     viewModel.saveState(fileTreeView)
   }

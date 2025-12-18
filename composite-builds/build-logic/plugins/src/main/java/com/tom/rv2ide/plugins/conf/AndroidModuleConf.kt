@@ -39,7 +39,7 @@ import org.gradle.api.provider.Provider
  * For example, if the base version code of the IDE is 270 (for v2.7.0), then for arm64-v8a flavor,
  * the version code will be `100 * 270 + 1` i.e. `27001`
  */
-internal val flavorsAbis = mapOf("arm64-v8a" to 1, "armeabi-v7a" to 2)
+internal val flavorsAbis = mapOf("arm64-v8a" to 1, "armeabi-v7a" to 1)
 
 fun Project.configureAndroidModule(coreLibDesugDep: Provider<MinimalExternalModuleDependency>) {
   val isAppModule = plugins.hasPlugin("com.android.application")
@@ -198,4 +198,5 @@ private fun Project.configureCoreLibDesugaring(
   if (coreLibDesugaringEnabled) {
     project.dependencies.add("coreLibraryDesugaring", coreLibDesugDep)
   }
+
 }

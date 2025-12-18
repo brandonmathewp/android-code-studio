@@ -252,4 +252,8 @@ class SubModuleFragment : Fragment() {
     super.onDestroyView()
     _binding = null
   }
+  override fun onDestroy() {
+      super.onDestroy()
+      com.tom.rv2ide.utils.EditorSidebarActions.removeFragmentFromCache("ide.editor.sidebar.subModule")
+  }
 }

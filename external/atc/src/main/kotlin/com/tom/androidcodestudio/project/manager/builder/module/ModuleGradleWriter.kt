@@ -348,9 +348,24 @@ class MLGradleWriter : IMLGradleWriter {
     if (config.dependencies.isNotEmpty()) {
       builder.appendLine()
       builder.appendLine("dependencies {")
+    
+      // matches strings like: implementation(platform(libs...))
+      val outerCallRegex = Regex("""^(\w+)\((.+)\)$""")
+    
       config.dependencies.forEach { dep ->
-        builder.appendLine("    ${dep.dependency.replace(Regex("[()]"), "  ")}")
+        val depStr = dep.dependency.trim()
+    
+        val cleaned = outerCallRegex.matchEntire(depStr)?.let { m ->
+          // func = e.g. implementation, inner = e.g. platform(libs.androidx.compose.bom)
+          val func = m.groupValues[1]
+          val inner = m.groupValues[2]
+          // Groovy wants: implementation platform(...)  (space, no outer parentheses)
+          "$func $inner"
+        } ?: depStr // if it doesn't match the pattern, leave it as-is
+    
+        builder.appendLine("    $cleaned")
       }
+    
       builder.appendLine("}")
     }
 

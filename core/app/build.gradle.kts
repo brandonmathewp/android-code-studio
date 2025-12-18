@@ -42,6 +42,12 @@ buildscript {
   }
 }
 
+tasks.configureEach {
+    if (name.contains("desugar", ignoreCase = true)) {
+        enabled = false
+    }
+}
+
 configurations.all {
   resolutionStrategy {
     force("com.google.guava:guava:32.1.3-android")
@@ -63,25 +69,28 @@ android {
     applicationId = BuildConfig.packageName
     vectorDrawables.useSupportLibrary = true
   }
+  
+  experimentalProperties["android.experimental.enableGlobalSynthetics"] = true
+  
 
-signingConfigs {
-    create("custom") {
-        val keyStorePath = "${rootProject.projectDir}/signing/signing-key.jks"
-        val keyStoreFile = file(keyStorePath)
-        
-        val signing_storePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: ""
-        val signing_keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: ""
-        
-        storeFile = keyStoreFile
-        storePassword = signing_storePassword
-        keyAlias = "AndroidCS"
-        keyPassword = signing_keyPassword
-    }
-}
+  signingConfigs {
+      create("custom") {
+          val keyStorePath = "${rootProject.projectDir}/signing/signing-key.jks"
+          val keyStoreFile = file(keyStorePath)
+          
+          val signing_storePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: ""
+          val signing_keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: ""
+          
+          storeFile = keyStoreFile
+          storePassword = signing_storePassword
+          keyAlias = "AndroidCS"
+          keyPassword = signing_keyPassword
+      }
+  }
 
   androidResources { generateLocaleConfig = true }
 
-  buildFeatures { 
+  buildFeatures {
     aidl = true
     dataBinding = true
   }
@@ -96,7 +105,7 @@ signingConfigs {
       signingConfig = signingConfigs.getByName("custom")
     }
   }
-
+  
   lint {
     abortOnError = false
     disable.addAll(arrayOf("VectorPath", "NestedWeights", "ContentDescription", "SmallSp"))
@@ -180,9 +189,12 @@ dependencies {
 
   // external deps here
   implementation("com.github.Dimezis:BlurView:version-3.2.0")
+  implementation("androidx.security:security-crypto:1.1.0-alpha06")
   implementation(projects.external.acsprovider)
   implementation(projects.external.atc) 
   implementation(libs.external.customizable.cardview)
+  implementation(projects.external.logwire)
+	implementation(libs.external.seasonal.effects)
   
   // Annotation processors
   kapt(libs.common.glide.ap)
@@ -262,6 +274,7 @@ dependencies {
   implementation(projects.event.eventbusAndroid)
   implementation(projects.event.eventbusEvents)
   implementation(projects.java.javacServices)
+  implementation(projects.java.lspSetup)
   implementation(projects.java.lsp)
   implementation(projects.logging.idestats)
   implementation(projects.logging.logsender)

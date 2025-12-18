@@ -359,7 +359,7 @@ abstract class ProjectHandlerActivity : BaseEditorActivity() {
    *
    * @param buildVariants A map of project paths to the selected build variants.
    */
-  fun initializeProject(buildVariants: Map<String, String>) {
+fun initializeProject(buildVariants: Map<String, String>) {
     val manager = ProjectManagerImpl.getInstance()
     val projectDir = manager.projectDir
     if (!projectDir.exists()) {
@@ -367,16 +367,24 @@ abstract class ProjectHandlerActivity : BaseEditorActivity() {
       return
     }
 
+    if (editorViewModel.isInitializing) {
+      log.warn("Project initialization already in progress. Skipping duplicate request.")
+      return
+    }
+
+    if (editorViewModel.isBuildInProgress) {
+      log.warn("Build is already in progress. Cannot initialize project now.")
+      return
+    }
+
     val initialized = manager.projectInitialized && manager.cachedInitResult != null
     log.debug("Is project initialized: {}", initialized)
-    // When returning after a configuration change between the initialization process,
-    // we do not want to start another project initialization
+
     if (isFromSavedInstance && initialized && !shouldInitialize) {
       log.debug("Skipping init process because initialized && !wasInitializing")
       return
     }
 
-    //noinspection ConstantConditions
     ThreadUtils.runOnUiThread { preProjectInit() }
 
     val buildService = Lookup.getDefault().lookup(BuildService.KEY_BUILD_SERVICE)
@@ -395,8 +403,6 @@ abstract class ProjectHandlerActivity : BaseEditorActivity() {
           log.debug("Sending init request to tooling server..")
           buildService.initializeProject(createProjectInitParams(projectDir, buildVariants))
         } else {
-          // The project initialization was in progress before the configuration change
-          // In this case, we should not start another project initialization
           log.debug("Using cached initialize result as the project is already initialized")
           CompletableFuture.supplyAsync {
             log.warn("GradleProject has already been initialized. Skipping initialization process.")
@@ -829,8 +835,8 @@ abstract class ProjectHandlerActivity : BaseEditorActivity() {
         projectName = manager.projectDir.name
       }
 
-      supportActionBar!!.subtitle = projectName
-      supportActionBar!!.setTitle("AndroidCS")
+      // supportActionBar!!.subtitle = projectName
+      // supportActionBar!!.setTitle("AndroidCS")
     } catch (th: Throwable) {
       // ignored
     }

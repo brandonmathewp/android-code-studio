@@ -425,7 +425,7 @@ class MainFragment : BaseFragment() {
     builder.show()
   }
 
-  private fun backupProject(project: File, onComplete: () -> Unit) {
+  fun backupProject(project: File, onComplete: () -> Unit = {}) {
     val coroutineScope = (activity as? BaseIDEActivity?)?.activityScope ?: viewLifecycleScope
 
     val backupDir = File(Environment.PROJECTS_DIR, "backed_up_projects")
@@ -523,10 +523,25 @@ class MainFragment : BaseFragment() {
   private fun deleteProject(project: File, onDeleted: () -> Unit) {
     val coroutineScope = (activity as? BaseIDEActivity?)?.activityScope ?: viewLifecycleScope
 
+    val builder = DialogUtils.newMaterialDialogBuilder(requireContext())
+    val binding = LayoutDialogProgressBinding.inflate(layoutInflater)
+
+    binding.message.visibility = View.VISIBLE
+    binding.message.text = "Deleting project..."
+    binding.progress.isIndeterminate = true
+
+    builder.setTitle("Delete in Progress")
+    builder.setMessage("Deleting ${project.name}")
+    builder.setView(binding.root)
+    builder.setCancelable(false)
+
+    val dialog = builder.show()
+
     coroutineScope.launch(Dispatchers.IO) {
       try {
         val deleted = project.deleteRecursively()
         withContext(Dispatchers.Main) {
+          dialog.dismiss()
           if (deleted) {
             flashSuccess(string.project_deleted_success)
             onDeleted()
@@ -536,7 +551,10 @@ class MainFragment : BaseFragment() {
         }
       } catch (e: Exception) {
         log.error("Error deleting project: ${project.absolutePath}", e)
-        withContext(Dispatchers.Main) { flashError(string.project_delete_failed) }
+        withContext(Dispatchers.Main) {
+          dialog.dismiss()
+          flashError(string.project_delete_failed)
+        }
       }
     }
   }

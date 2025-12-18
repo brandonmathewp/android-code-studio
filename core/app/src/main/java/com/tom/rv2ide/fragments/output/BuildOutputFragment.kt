@@ -67,6 +67,11 @@ class BuildOutputFragment : NonEditableEditorFragment() {
       return
     }
 
+    // Filter out unwanted messages
+    if (shouldFilterOutput(output)) {
+      return
+    }
+
     if (editor == null) {
       unsavedLines.add(output)
       return
@@ -86,6 +91,27 @@ class BuildOutputFragment : NonEditableEditorFragment() {
       flushPending = true
       flushHandler.postDelayed(flushRunnable, FLUSH_DELAY_MS)
     }
+  }
+
+  private fun shouldFilterOutput(output: String?): Boolean {
+    if (output == null) return false
+    
+    val trimmedOutput = output.trim()
+    
+    // Filter: "Starting a Gradle Daemon, ...., use --status for details"
+    if (trimmedOutput.startsWith("Starting a Gradle Daemon") && 
+        trimmedOutput.contains("use --status for details")) {
+      return true
+    }
+    
+    // Filter: WARNING about android.aapt2FromMavenOverride
+    if (trimmedOutput.startsWith("WARNING:") && 
+        trimmedOutput.contains("android.aapt2FromMavenOverride") &&
+        trimmedOutput.contains("is experimental")) {
+      return true
+    }
+    
+    return false
   }
 
   private fun flushPendingOutput() {

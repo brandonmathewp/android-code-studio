@@ -45,6 +45,7 @@ dependencies {
   kapt(libs.google.auto.service)
 
   api(projects.core.indexingApi)
+  api(projects.core.projectdata)
 
   // Include the Kotlin language server modules
   // implementation(projects.server.server)

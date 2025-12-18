@@ -81,9 +81,19 @@ public class SourceFileManager extends ForwardingJavaFileManager<JavacFileManage
     System.setProperty(JavacConfigProvider.PROP_ANDROIDIDE_JAVA_HOME,
         Environment.JAVA_HOME.getAbsolutePath());
 
+    com.tom.rv2ide.projectdata.logs.LogStream.INSTANCE.emitLineBlocking("Configuring source paths...");
     setLocationLogError(StandardLocation.SOURCE_PATH, module.getCompileSourceDirectories());
+    
+    com.tom.rv2ide.projectdata.logs.LogStream.INSTANCE.emitLineBlocking("Configuring classpaths...");
     setLocationLogError(StandardLocation.CLASS_PATH, configureClasspaths(module));
+    
+    com.tom.rv2ide.projectdata.logs.LogStream.INSTANCE.emitLineBlocking("Indexing project files...");
     listLocations(EnumSet.of(StandardLocation.CLASS_PATH, StandardLocation.PLATFORM_CLASS_PATH));
+    
+    com.tom.rv2ide.projectdata.logs.LogStream.INSTANCE.emitLineBlocking("File manager initialization complete!");
+    
+    // Clear indexing flag after initialization
+    com.tom.rv2ide.projectdata.state.lsp.Index.INSTANCE.setIsIndexing(false);
   }
 
   @NonNull
@@ -236,6 +246,11 @@ public class SourceFileManager extends ForwardingJavaFileManager<JavacFileManage
 
   private static SourceFileManager createForModule(@NonNull ModuleProject project) {
     LOG.info("Creating source file manager instance for module: {}", project);
+    
+    // Set indexing flag to show banner
+    com.tom.rv2ide.projectdata.state.lsp.Index.INSTANCE.setIsIndexing(true);
+    
+    com.tom.rv2ide.projectdata.logs.LogStream.INSTANCE.emitLineBlocking("Initializing file manager for: " + project.getName());
     return new SourceFileManager(project);
   }
 

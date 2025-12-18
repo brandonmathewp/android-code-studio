@@ -20,6 +20,7 @@ package com.tom.rv2ide.activities
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
+import android.widget.FrameLayout
 import android.view.View
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
@@ -42,6 +43,8 @@ import com.tom.rv2ide.viewmodel.MainViewModel
 import com.tom.rv2ide.viewmodel.MainViewModel.Companion.SCREEN_MAIN
 import com.tom.rv2ide.viewmodel.MainViewModel.Companion.SCREEN_TEMPLATE_DETAILS
 import com.tom.rv2ide.viewmodel.MainViewModel.Companion.SCREEN_TEMPLATE_LIST
+import com.tom.rv2ide.setup.updater.lsp.KotlinLspUpdater
+import com.tom.rv2ide.setup.updater.lsp.data.LSPProperties
 import java.io.File
 
 class MainActivity : EdgeToEdgeIDEActivity() {
@@ -103,6 +106,10 @@ class MainActivity : EdgeToEdgeIDEActivity() {
     }
     
     onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+    val updater = KotlinLspUpdater(this)
+    updater.checkForUpdates(LSPProperties.kotlinLspVersion)
+    
+            
   }
 
   override fun onApplySystemBarInsets(insets: Insets) {

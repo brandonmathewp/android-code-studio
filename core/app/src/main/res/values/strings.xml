@@ -57,6 +57,8 @@
   <string name="terminal_empty_message">No terminal sessions are currently open. Create a new session to get started.</string>
   <string name="terminal_create_first">Create Terminal</string>
 
+  <string name="edit">Edit</string>
+
 
 
 </resources>

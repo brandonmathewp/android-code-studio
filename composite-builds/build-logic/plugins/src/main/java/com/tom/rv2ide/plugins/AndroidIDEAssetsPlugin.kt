@@ -53,8 +53,8 @@ class AndroidIDEAssetsPlugin : Plugin<Project> {
           }
 
       androidComponentsExtension.onVariants { variant ->
-        val variantNameCapitalized = variant.name.capitalized()
-
+        val variantNameCapitalized = variant.name.replaceFirstChar { it.uppercase() }
+        
         // variant.sources.jniLibs?.addGeneratedSourceDirectory(setupAapt2TaskTaskProvider,
         // SetupAapt2Task::outputDirectory)
 

@@ -17,7 +17,6 @@
 
 package com.tom.rv2ide.activities.editor
 
-// import com.tom.rv2ide.editor.language.treesitter.CppLang
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
@@ -41,6 +40,7 @@ import com.tom.rv2ide.editor.language.treesitter.KotlinLanguage
 import com.tom.rv2ide.editor.language.treesitter.LogLanguage
 import com.tom.rv2ide.editor.language.treesitter.TSLanguageRegistry
 import com.tom.rv2ide.editor.language.treesitter.XMLLanguage
+import com.tom.rv2ide.editor.language.treesitter.CppLang
 import com.tom.rv2ide.editor.schemes.IDEColorSchemeProvider
 import com.tom.rv2ide.editor.ui.IDEEditor
 import com.tom.rv2ide.eventbus.events.editor.DocumentChangeEvent
@@ -134,7 +134,10 @@ open class EditorHandlerActivity : ProjectHandlerActivity(), IEditorHandler {
       TSLanguageRegistry.instance.register(JavaLanguage.TS_TYPE, JavaLanguage.FACTORY)
       TSLanguageRegistry.instance.register(KotlinLanguage.TS_TYPE_KT, KotlinLanguage.FACTORY)
       TSLanguageRegistry.instance.register(KotlinLanguage.TS_TYPE_KTS, KotlinLanguage.FACTORY)
-      // TSLanguageRegistry.instance.register(CppLang.TS_TYPE_CPP, CppLang.FACTORY)
+      TSLanguageRegistry.instance.register(CppLang.TS_TYPE_CPP, CppLang.FACTORY)
+      TSLanguageRegistry.instance.register(CppLang.TS_TYPE_C, CppLang.FACTORY)
+      TSLanguageRegistry.instance.register(CppLang.TS_TYPE_H, CppLang.FACTORY)
+      TSLanguageRegistry.instance.register(CppLang.TS_TYPE_HPP, CppLang.FACTORY)
       TSLanguageRegistry.instance.register(LogLanguage.TS_TYPE, LogLanguage.FACTORY)
       TSLanguageRegistry.instance.register(JsonLanguage.TS_TYPE, JsonLanguage.FACTORY)
       TSLanguageRegistry.instance.register(XMLLanguage.TS_TYPE, XMLLanguage.FACTORY)
@@ -315,31 +318,33 @@ open class EditorHandlerActivity : ProjectHandlerActivity(), IEditorHandler {
   }
 
   override fun openFileAndGetIndex(file: File, selection: Range?): Int {
-    val openedFileIndex = findIndexOfEditorByFile(file)
-    if (openedFileIndex != -1) {
-      return openedFileIndex
-    }
-
-    if (!file.exists()) {
-      return -1
-    }
-
-    val position = editorViewModel.getOpenedFileCount()
-
-    log.info("Opening file at index {} file:{}", position, file)
-
-    val editor = CodeEditorView(this, file, selection!!)
-    editor.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
-
-    content.editorContainer.addView(editor)
-    content.tabs.addTab(content.tabs.newTab())
-
-    editorViewModel.addFile(file)
-    editorViewModel.setCurrentFile(position, file)
-
-    updateTabs()
-
-    return position
+      val openedFileIndex = findIndexOfEditorByFile(file)
+      if (openedFileIndex != -1) {
+          return openedFileIndex
+      }
+  
+      if (!file.exists()) {
+          return -1
+      }
+  
+      val position = editorViewModel.getOpenedFileCount()
+  
+      log.info("Opening file at index {} file:{}", position, file)
+  
+      val editor = CodeEditorView(this, file, selection!!)
+      editor.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+  
+      content.editorContainer.addView(editor)
+      content.tabs.addTab(content.tabs.newTab())
+  
+      editorViewModel.addFile(file)
+      editorViewModel.setCurrentFile(position, file)
+  
+      updateTabs()
+  
+      onFileLoaded(editor, file)
+  
+      return position
   }
 
   override fun getEditorForFile(file: File): CodeEditorView? {
@@ -728,5 +733,9 @@ open class EditorHandlerActivity : ProjectHandlerActivity(), IEditorHandler {
         }
       }
     }
+  }
+  override fun onDestroy() {
+    super.onDestroy()
+    com.tom.rv2ide.managers.CodeCompletionManager.clearInstance()
   }
 }

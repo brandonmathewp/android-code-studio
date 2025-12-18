@@ -72,4 +72,5 @@ interface IDEBuildConfigProvider {
       return _instance
     }
   }
+  
 }

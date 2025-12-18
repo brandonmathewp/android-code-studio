@@ -24,13 +24,14 @@
 
     <com.google.android.material.button.MaterialButton
       android:id="@+id/btnBrowse"
-      style="@style/Widget.Material3.Button.IconButton"
-      android:layout_width="48dp"
-      android:layout_height="48dp"
+      style="@style/Widget.Material3.Button.TonalButton"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
       android:contentDescription="@string/browse_other_location"
       app:icon="@drawable/ic_folder"
+      android:text="import project"
       app:iconGravity="textStart"
-      app:iconPadding="0dp" />
+      />
 
   </LinearLayout>
 

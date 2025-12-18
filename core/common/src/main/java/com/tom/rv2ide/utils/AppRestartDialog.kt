@@ -30,24 +30,27 @@ import com.tom.rv2ide.resources.R
 class AppRestartDialog private constructor() {
 
   companion object {
-    fun show(context: Context, onCancel: (() -> Unit)? = null) {
-      MaterialAlertDialogBuilder(context)
-          .setTitle(context.getString(R.string.restart_app_title))
-          .setMessage(context.getString(R.string.restart_app_message))
-          .setPositiveButton(context.getString(R.string.restart_action)) { dialog, _ ->
-            dialog.dismiss()
-            restartApp(context)
-          }
-          .setNegativeButton(context.getString(R.string.cancel_action)) { dialog, _ ->
-            dialog.dismiss()
-            onCancel?.invoke()
-          }
-          .setCancelable(false)
-          .create()
-          .show()
+    fun show(
+        context: Context,
+        callback: ((isRestartBtnClicked: Boolean) -> Unit)? = null
+    ) {
+        MaterialAlertDialogBuilder(context)
+            .setTitle(context.getString(R.string.restart_app_title))
+            .setMessage(context.getString(R.string.restart_app_message))
+            .setPositiveButton(context.getString(R.string.restart_action)) { dialog, _ ->
+                dialog.dismiss()
+                callback?.invoke(true)
+            }
+            .setNegativeButton(context.getString(R.string.cancel_action)) { dialog, _ ->
+                dialog.dismiss()
+                callback?.invoke(false)
+            }
+            .setCancelable(false)
+            .create()
+            .show()
     }
 
-    private fun restartApp(context: Context) {
+    fun restartApp(context: Context) {
       val packageManager = context.packageManager
       val intent = packageManager.getLaunchIntentForPackage(context.packageName)
       val componentName = intent?.component

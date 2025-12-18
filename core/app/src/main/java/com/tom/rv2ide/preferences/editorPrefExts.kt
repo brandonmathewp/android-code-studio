@@ -27,6 +27,7 @@ import com.tom.rv2ide.editor.schemes.IDEColorSchemeProvider
 import com.tom.rv2ide.preferences.internal.EditorPreferences
 import com.tom.rv2ide.preferences.internal.EditorPreferences.AUTO_SAVE
 import com.tom.rv2ide.preferences.internal.EditorPreferences.AUTO_SAVE_TWO
+import com.tom.rv2ide.preferences.internal.EditorPreferences.KEYBOARD_SUGGESTIONS
 import com.tom.rv2ide.preferences.internal.EditorPreferences.COLOR_SCHEME
 import com.tom.rv2ide.preferences.internal.EditorPreferences.COMPLETIONS_MATCH_LOWER
 import com.tom.rv2ide.preferences.internal.EditorPreferences.DEFAULT_COLOR_SCHEME
@@ -47,9 +48,14 @@ import com.tom.rv2ide.preferences.internal.EditorPreferences.USE_SOFT_TAB
 import com.tom.rv2ide.preferences.internal.EditorPreferences.WORD_WRAP
 import com.tom.rv2ide.resources.R.drawable
 import com.tom.rv2ide.resources.R.string
+import com.tom.rv2ide.utils.Environment
 import kotlin.reflect.KMutableProperty0
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
+import android.content.Intent
+import android.app.Activity
+import android.widget.Toast
+import java.io.File
 
 @Parcelize
 class EditorPreferencesScreen(
@@ -81,7 +87,7 @@ private class CommonConfigurations(
     addPreference(NonPrintablePaintingFlags())
     addPreference(FontLigatures())
     addPreference(autoSave())
-    // addPreference(stringExtHelper()) -> deprecated -> it's now accessable via text selection menu
+    addPreference(keyboardSuggestions())
     addPreference(UseCustomFont())
     addPreference(UseSoftTab())
     addPreference(WordWrap())
@@ -156,6 +162,18 @@ private class autoSave(
     SwitchPreference(
         setValue = EditorPreferences::autoSave_two::set,
         getValue = EditorPreferences::autoSave_two::get,
+    )
+
+@Parcelize
+private class keyboardSuggestions(
+    override val key: String = KEYBOARD_SUGGESTIONS,
+    override val title: Int = string.idepref_editor_keyboard_sugg_title,
+    override val summary: Int? = string.idepref_editor_keyboard_sugg_summary,
+    override val icon: Int? = drawable.ic_suggestion,
+) :
+    SwitchPreference(
+        setValue = EditorPreferences::keyboardSuggestions::set,
+        getValue = EditorPreferences::keyboardSuggestions::get,
     )
 
 @Parcelize
@@ -343,11 +361,91 @@ private class UseCustomFont(
     override val title: Int = string.idepref_customFont_title,
     override val summary: Int? = string.idepref_customFont_summary,
     override val icon: Int? = drawable.ic_custom_font,
-) :
-    SwitchPreference(
-        setValue = EditorPreferences::useCustomFont::set,
-        getValue = EditorPreferences::useCustomFont::get,
+) : SingleChoicePreference() {
+
+  companion object {
+    const val PICK_FONT_REQUEST = 1001
+  }
+
+  @IgnoredOnParcel override val dialogCancellable = true
+
+  override fun getEntries(preference: Preference): Array<PreferenceChoices.Entry> {
+    val fontDir = File("${Environment.HOME}/.androidide/ui")
+    val fontFiles = fontDir.listFiles { file ->
+      file.extension.lowercase() in listOf("ttf", "otf")
+    }?.map { it.name }?.sorted() ?: emptyList()
+    
+    val currentFont = EditorPreferences.selectedCustomFont
+    
+    val entries = mutableListOf<PreferenceChoices.Entry>()
+    
+    entries.add(
+      PreferenceChoices.Entry(
+        label = "JetBrains Mono (Default)",
+        _isChecked = currentFont == null,
+        data = ""
+      )
     )
+    
+    fontFiles.forEach { fontName ->
+      entries.add(
+        PreferenceChoices.Entry(
+          label = fontName.substringBeforeLast("."),
+          _isChecked = currentFont == fontName,
+          data = fontName
+        )
+      )
+    }
+    
+    entries.add(
+      PreferenceChoices.Entry(
+        label = "+ Add New Font",
+        _isChecked = false,
+        data = "ADD_NEW"
+      )
+    )
+    
+    return entries.toTypedArray()
+  }
+
+  override fun onChoiceConfirmed(
+      preference: Preference,
+      entry: PreferenceChoices.Entry?,
+      position: Int,
+  ) {
+    when (entry?.data) {
+      "ADD_NEW" -> {
+        openFontPicker(preference)
+      }
+      null -> {
+        EditorPreferences.selectedCustomFont = null
+        Toast.makeText(preference.context, "Using default font", Toast.LENGTH_SHORT).show()
+      }
+      else -> {
+        EditorPreferences.selectedCustomFont = entry.data as String
+        Toast.makeText(preference.context, "Font selected: ${entry.label}", Toast.LENGTH_SHORT).show()
+      }
+    }
+  }
+
+  private fun openFontPicker(preference: Preference) {
+    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+      type = "*/*"
+      addCategory(Intent.CATEGORY_OPENABLE)
+      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf"))
+    }
+
+    try {
+      val activity = preference.context as? Activity
+      activity?.startActivityForResult(
+          Intent.createChooser(intent, "Select Font File"),
+          PICK_FONT_REQUEST
+      )
+    } catch (e: Exception) {
+      Toast.makeText(preference.context, "Error opening file picker: ${e.message}", Toast.LENGTH_SHORT).show()
+    }
+  }
+}
 
 @Parcelize
 private class DeleteEmptyLines(

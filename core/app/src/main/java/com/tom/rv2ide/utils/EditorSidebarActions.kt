@@ -1,20 +1,3 @@
-/*
- *  This file is part of AndroidIDE.
- *
- *  AndroidIDE is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  AndroidIDE is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *   along with AndroidIDE.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 package com.tom.rv2ide.utils
 
 import android.content.Context
@@ -41,17 +24,15 @@ import com.tom.rv2ide.actions.sidebar.CloseProjectSidebarAction
 import com.tom.rv2ide.actions.sidebar.FileTreeSidebarAction
 import com.tom.rv2ide.actions.sidebar.PreferencesSidebarAction
 import com.tom.rv2ide.actions.sidebar.SubModuleSidebarAction
+import com.tom.rv2ide.actions.sidebar.GitClientAction
 import com.tom.rv2ide.actions.sidebar.TerminalSidebarAction
 import com.tom.rv2ide.fragments.sidebar.EditorSidebarFragment
+import androidx.fragment.app.Fragment
 import java.lang.ref.WeakReference
 
-/**
- * Sets up the actions that are shown in the
- * [EditorActivityKt][com.tom.rv2ide.activities.editor.EditorActivityKt]'s drawer's sidebar.
- *
- * @author Akash Yadav
- */
 internal object EditorSidebarActions {
+
+  private val fragmentCache = mutableMapOf<String, Fragment>()
 
   @JvmStatic
   fun registerActions(context: Context) {
@@ -61,21 +42,22 @@ internal object EditorSidebarActions {
     @Suppress("KotlinConstantConditions")
     registry.registerAction(FileTreeSidebarAction(context, ++order))
     registry.registerAction(BuildVariantsSidebarAction(context, ++order))
+    registry.registerAction(GitClientAction(context, ++order))
     registry.registerAction(AIAgentSidebarAction(context, ++order))
     registry.registerAction(AssetStudioSidebarAction(context, ++order))
     registry.registerAction(SubModuleSidebarAction(context, ++order))
-    registry.registerAction(TerminalSidebarAction(context, ++order))
     registry.registerAction(PreferencesSidebarAction(context, ++order))
     registry.registerAction(CloseProjectSidebarAction(context, ++order))
   }
 
   @JvmStatic
+  fun removeFragmentFromCache(fragmentId: String) {
+    fragmentCache.remove(fragmentId)
+  }
+
+  @JvmStatic
   fun setup(sidebarFragment: EditorSidebarFragment) {
     val binding = sidebarFragment.getBinding() ?: return
-    val navHostFragment =
-        sidebarFragment.childFragmentManager.findFragmentById(binding.fragmentContainer.id)
-            as? NavHostFragment ?: return
-    val controller = navHostFragment.navController
     val context = sidebarFragment.requireContext()
     val navigationRecycler =
         binding.navigation.findViewById<androidx.recyclerview.widget.RecyclerView>(
@@ -94,18 +76,37 @@ internal object EditorSidebarActions {
     val titleRef = WeakReference(binding.title)
     val subtitleRef = WeakReference(binding.subtitle)
 
-    // Sort actions by their order property to maintain registration order
+    fun updateTitleVisibility(title: String?) {
+      titleRef.get()?.let { titleView ->
+        if (!title.isNullOrEmpty()) {
+          titleView.text = title
+          titleView.visibility = android.view.View.VISIBLE
+        } else {
+          titleView.visibility = android.view.View.GONE
+        }
+      }
+    }
+
+    fun updateSubtitleVisibility(subtitle: String?) {
+      subtitleRef.get()?.let { subtitleView ->
+        if (!subtitle.isNullOrEmpty()) {
+          subtitleView.text = subtitle
+          subtitleView.visibility = android.view.View.VISIBLE
+        } else {
+          subtitleView.visibility = android.view.View.GONE
+        }
+      }
+    }
+
     val sortedActions =
         actions.entries.sortedBy { (_, action) ->
           (action as? SidebarActionItem)?.order ?: Int.MAX_VALUE
         }
 
-    // Create navigation items from sorted actions
     val navigationItems =
         sortedActions.map { (actionId, action) ->
           action as SidebarActionItem
 
-          // Prepare the action to ensure subtitle is updated
           action.prepare(data)
 
           SidebarNavigationItem(
@@ -118,9 +119,10 @@ internal object EditorSidebarActions {
           )
         }
 
-    // Set up RecyclerView adapter
-    val adapter =
-        SidebarNavigationAdapter(
+    var currentFragmentId: String? = null
+    lateinit var adapter: SidebarNavigationAdapter
+
+    adapter = SidebarNavigationAdapter(
             onItemClick = { item ->
               val action = item.action
 
@@ -129,34 +131,44 @@ internal object EditorSidebarActions {
                 return@SidebarNavigationAdapter
               }
 
-              try {
-                controller.navigate(
-                    action.id,
-                    navOptions {
-                      launchSingleTop = true
-                      restoreState = true
-                    },
-                )
-
-                titleRef.get()?.text = item.title
-
-                // Update subtitle in header
-                val subtitle = item.subtitle
-                subtitleRef.get()?.let { subtitleView ->
-                  if (!subtitle.isNullOrEmpty()) {
-                    subtitleView.text = subtitle
-                    subtitleView.visibility = android.view.View.VISIBLE
-                  } else {
-                    subtitleView.visibility = android.view.View.GONE
-                  }
-                }
-              } catch (e: IllegalArgumentException) {
-                // Navigation failed
+              if (currentFragmentId == action.id) {
+                return@SidebarNavigationAdapter
               }
+
+              val fragment = fragmentCache.getOrPut(action.id) {
+                action.fragmentClass!!.java.newInstance()
+              }
+
+              val fragmentManager = sidebarFragment.childFragmentManager
+              val transaction = fragmentManager.beginTransaction()
+
+              fragmentManager.fragments.forEach { existingFragment ->
+                if (existingFragment.isAdded) {
+                  transaction.hide(existingFragment)
+                }
+              }
+
+              if (fragment.isAdded) {
+                transaction.show(fragment)
+              } else {
+                transaction.add(binding.fragmentContainer.id, fragment, action.id)
+              }
+
+              transaction.commitNow()
+
+              currentFragmentId = action.id
+
+              updateTitleVisibility(item.title)
+              updateSubtitleVisibility(item.subtitle)
+
+              val updatedItems =
+                  navigationItems.map { navItem -> 
+                    navItem.copy(isSelected = navItem.id == item.id) 
+                  }
+              adapter.submitList(updatedItems)
             },
             onItemLongClick = { item ->
               if (item.action is TerminalSidebarAction) {
-                TerminalSidebarAction.startTerminalActivity(data, true)
                 true
               } else {
                 false
@@ -169,70 +181,22 @@ internal object EditorSidebarActions {
     navigationRecycler.adapter = adapter
     adapter.submitList(navigationItems)
 
-    // Set up navigation graph with sorted actions
-    controller.graph =
-        controller.createGraph(startDestination = FileTreeSidebarAction.ID) {
-          sortedActions.forEach { (actionId, action) ->
-            if (action !is SidebarActionItem) {
-              throw IllegalStateException(
-                  "Actions registered at location ${ActionItem.Location.EDITOR_SIDEBAR}" +
-                      " must implement ${SidebarActionItem::class.java.simpleName}"
-              )
-            }
-
-            val fragment = action.fragmentClass ?: return@forEach
-
-            val builder =
-                FragmentNavigatorDestinationBuilder(
-                        this@createGraph.provider[FragmentNavigator::class],
-                        actionId,
-                        fragment,
-                    )
-                    .apply { action.apply { buildNavigation() } }
-
-            addDestination(builder.build())
-          }
-        }
-
-    // Listen for navigation changes
-    controller.addOnDestinationChangedListener { _, destination, _ ->
-      val matchingItem = navigationItems.find { item -> destination.matchDestination(item.id) }
-      matchingItem?.let { item ->
-        val updatedItems =
-            navigationItems.map { navItem -> navItem.copy(isSelected = navItem.id == item.id) }
-        adapter.submitList(updatedItems)
-        titleRef.get()?.text = item.title
-
-        // Update subtitle in header
-        val subtitle = item.subtitle
-        subtitleRef.get()?.let { subtitleView ->
-          if (!subtitle.isNullOrEmpty()) {
-            subtitleView.text = subtitle
-            subtitleView.visibility = android.view.View.VISIBLE
-          } else {
-            subtitleView.visibility = android.view.View.GONE
-          }
-        }
-      }
-    }
-
-    // Set initial selection
     val firstItem = navigationItems.first()
-    titleRef.get()?.text = firstItem.title
-
-    // Set initial subtitle
-    val firstSubtitle = firstItem.subtitle
-    subtitleRef.get()?.let { subtitleView ->
-      if (!firstSubtitle.isNullOrEmpty()) {
-        subtitleView.text = firstSubtitle
-        subtitleView.visibility = android.view.View.VISIBLE
-      } else {
-        subtitleView.visibility = android.view.View.GONE
-      }
+    val firstFragment = fragmentCache.getOrPut(firstItem.id) {
+      firstItem.action.fragmentClass?.java?.newInstance() 
+          ?: throw IllegalStateException("First action must have a fragment")
     }
+
+    sidebarFragment.childFragmentManager.beginTransaction()
+        .add(binding.fragmentContainer.id, firstFragment, firstItem.id)
+        .commitNow()
+
+    currentFragmentId = firstItem.id
+
+    updateTitleVisibility(firstItem.title)
+    updateSubtitleVisibility(firstItem.subtitle)
   }
 
-  /** Determines whether the given `route` matches the NavDestination. */
   @JvmStatic
   internal fun NavDestination.matchDestination(route: String): Boolean =
       hierarchy.any { it.route == route }

@@ -24,9 +24,9 @@ package com.tom.rv2ide.lsp.kotlin
 class KotlinEventHandler(private val documentManager: KotlinDocumentManager) {
 
   private val lastChangeTime = java.util.concurrent.ConcurrentHashMap<String, Long>()
-  private val changeThrottleMs = 100L // Only process changes every 200ms
+  private val changeThrottleMs = 100L // Only process changes every 100ms
   private val lastSaveTime = java.util.concurrent.ConcurrentHashMap<String, Long>()
-  private val saveDebounceMs = 40L
+  private val saveDebounceMs = 0L
 
   @org.greenrobot.eventbus.Subscribe(threadMode = org.greenrobot.eventbus.ThreadMode.ASYNC)
   fun onContentChange(event: com.tom.rv2ide.eventbus.events.editor.DocumentChangeEvent) {

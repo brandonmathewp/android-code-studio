@@ -20,9 +20,12 @@ package com.tom.rv2ide.adapters
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.tom.rv2ide.R
+import com.tom.rv2ide.databinding.DialogEditModuleConfigBinding
 import com.tom.rv2ide.databinding.LayoutBuildVariantItemBinding
 import com.tom.rv2ide.tooling.api.IAndroidProject
 import com.tom.rv2ide.tooling.api.models.BuildVariantInfo
@@ -36,6 +39,7 @@ import java.util.Objects
  * @property items
  * @author Akash Yadav
  */
+ 
 class BuildVariantsAdapter(
     private val viewModel: BuildVariantsViewModel,
     private var items: List<BuildVariantInfo>,
@@ -60,6 +64,12 @@ class BuildVariantsAdapter(
 
     binding.moduleName.text = variantInfo.projectPath
 
+    updateModuleInfo(binding, variantInfo)
+
+    binding.editConfig.setOnClickListener {
+      showEditDialog(binding, variantInfo, position)
+    }
+
     binding.variantName.apply {
       val viewModel = viewModel
 
@@ -77,20 +87,23 @@ class BuildVariantsAdapter(
       }
 
       this.listSelection = listSelection
-      setText(variantInfo.selectedVariant, false)
+      
+      val validSelectedVariant = if (variantInfo.buildVariants.contains(variantInfo.selectedVariant)) {
+        variantInfo.selectedVariant
+      } else {
+        variantInfo.buildVariants.getOrNull(listSelection) ?: IAndroidProject.DEFAULT_VARIANT
+      }
+      
+      setText(validSelectedVariant, false)
 
       addTextChangedListener { editable ->
-        // update the changed build variants map
         viewModel.updatedBuildVariants =
             viewModel.updatedBuildVariants.also { variants ->
 
-              // the newly selected build variant
-              // if this is different that the variant that was used while initializing the project,
-              // then the user is notified to re-sync the project
-              // else the selection is cleared
               val newSelection = editable?.toString() ?: IAndroidProject.DEFAULT_VARIANT
 
-              if (!Objects.equals(variantInfo.selectedVariant, newSelection)) {
+              if (!Objects.equals(variantInfo.selectedVariant, newSelection) && 
+                  variantInfo.buildVariants.contains(newSelection)) {
                 variants[variantInfo.projectPath] = variantInfo.withSelection(newSelection)
               } else {
                 variants.remove(variantInfo.projectPath)
@@ -98,5 +111,49 @@ class BuildVariantsAdapter(
             }
       }
     }
+  }
+
+  private fun updateModuleInfo(binding: LayoutBuildVariantItemBinding, variantInfo: BuildVariantInfo) {
+    binding.moduleInfo.text = buildString {
+      variantInfo.versionName?.let { append("v$it") }
+      
+      if (variantInfo.minSdk != null || variantInfo.targetSdk != null) {
+        if (isNotEmpty()) append(" • ")
+        variantInfo.minSdk?.let { append("Min $it") }
+        if (variantInfo.minSdk != null && variantInfo.targetSdk != null) append(" • ")
+        variantInfo.targetSdk?.let { append("Target $it") }
+      }
+    }.takeIf { it.isNotEmpty() }
+  }
+
+  private fun showEditDialog(binding: LayoutBuildVariantItemBinding, variantInfo: BuildVariantInfo, position: Int) {
+    val context = binding.root.context
+    val dialogBinding = DialogEditModuleConfigBinding.inflate(LayoutInflater.from(context))
+
+    dialogBinding.versionName.setText(variantInfo.versionName ?: "")
+    dialogBinding.versionCode.setText(variantInfo.versionCode?.toString() ?: "")
+    dialogBinding.minSdk.setText(variantInfo.minSdk?.toString() ?: "")
+    dialogBinding.targetSdk.setText(variantInfo.targetSdk?.toString() ?: "")
+    dialogBinding.compileSdk.setText(variantInfo.compileSdk?.toString() ?: "")
+
+    MaterialAlertDialogBuilder(context)
+        .setTitle("Edit ${variantInfo.projectPath}")
+        .setView(dialogBinding.root)
+        .setPositiveButton("Save") { _, _ ->
+          val updatedInfo = variantInfo.copy(
+              versionName = dialogBinding.versionName.text?.toString()?.takeIf { it.isNotEmpty() },
+              versionCode = dialogBinding.versionCode.text?.toString()?.toIntOrNull(),
+              minSdk = dialogBinding.minSdk.text?.toString()?.toIntOrNull(),
+              targetSdk = dialogBinding.targetSdk.text?.toString()?.toIntOrNull(),
+              compileSdk = dialogBinding.compileSdk.text?.toString()?.toIntOrNull()
+          )
+          
+          items = items.toMutableList().apply { set(position, updatedInfo) }
+          notifyItemChanged(position)
+          
+          viewModel.updateModuleConfig(variantInfo.projectPath, updatedInfo)
+        }
+        .setNegativeButton("Cancel", null)
+        .show()
   }
 }

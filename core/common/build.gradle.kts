@@ -28,9 +28,7 @@ android {
 }
 
 dependencies {
-
     implementation("androidx.documentfile:documentfile:1.0.1")
-   
     api(libs.common.editor)
     api(libs.common.lang3)
     api(libs.common.utilcode)

@@ -16,7 +16,6 @@
  */
 
 package com.tom.rv2ide.tooling.api.models
-
 /**
  * Information about the build variants of an Android module.
  *
@@ -29,26 +28,34 @@ data class BuildVariantInfo(
     val projectPath: String,
     val buildVariants: List<String>,
     val selectedVariant: String,
+    val versionName: String? = null,
+    val versionCode: Int? = null,
+    val minSdk: Int? = null,
+    val targetSdk: Int? = null,
+    val compileSdk: Int? = null
 ) {
 
   companion object {
 
-    /**
-     * Creates a new [BuildVariantInfo] object with the given selected variants. All the properties
-     * of this [BuildVariantInfo] is copied to the new [BuildVariantInfo] and the [newSelection] is
-     * set as the [BuildVariantInfo.selectedVariant].
-     */
     @JvmStatic
     fun BuildVariantInfo.withSelection(newSelection: String): BuildVariantInfo {
       require(this.buildVariants.indexOf(newSelection) != -1) {
         "'$newSelection' is not a valid variant name. Available variants: ${this.buildVariants}"
       }
-      return BuildVariantInfo(this.projectPath, this.buildVariants, newSelection)
+      return BuildVariantInfo(
+          this.projectPath, 
+          this.buildVariants, 
+          newSelection,
+          this.versionName,
+          this.versionCode,
+          this.minSdk,
+          this.targetSdk,
+          this.compileSdk
+      )
     }
   }
 }
 
-/** Maps the values to the selected variant names. */
 fun Map<String, BuildVariantInfo>.mapToSelectedVariants(): Map<String, String> {
   return mapValues { it.value.selectedVariant }
 }

@@ -20,4 +20,5 @@
   <dimen name="editor_container_corners">28dp</dimen>
   <dimen name="color_preset_size">32dp</dimen>
   <dimen name="templates_preview_size">100dp</dimen>
+  <dimen name="navigation_rail_width">80dp</dimen>
 </resources>

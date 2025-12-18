@@ -98,6 +98,7 @@ class GradleBuildService :
   private var notificationManager: NotificationManager? = null
   private var server: IToolingApiServer? = null
   private var eventListener: EventListener? = null
+  private var isReleaseVariant = false
 
   private val buildServiceScope =
       CoroutineScope(Dispatchers.Default + CoroutineName("GradleBuildService"))
@@ -372,20 +373,22 @@ class GradleBuildService :
 
   override fun getBuildArguments(): CompletableFuture<List<String>> {
     val extraArgs = ArrayList<String>()
-
-    val initScriptPath = System.getProperty("ide.logger.init.script")
-    if (initScriptPath != null) {
-      extraArgs.add("--init-script")
-      extraArgs.add(initScriptPath)
-      // Clear it after use
-      System.clearProperty("ide.logger.init.script")
+    
+    if (DevOpsPreferences.logsenderEnabled) {
+      injectLoggerForCurrentBuild()
+      if (!isReleaseVariant) {
+        val initScriptPath = System.getProperty("ide.logger.init.script")
+        if (initScriptPath != null) {
+          extraArgs.add("--init-script")
+          extraArgs.add(initScriptPath)
+          System.clearProperty("ide.logger.init.script")
+        }
+      }
     }
 
     // Override AAPT2 binary
     extraArgs.add("-Pandroid.aapt2FromMavenOverride=" + Environment.AAPT2.absolutePath)
     extraArgs.add("-P${PROPERTY_LOGSENDER_ENABLED}=${DevOpsPreferences.logsenderEnabled}")
-
-    // extraArgs.add("-Pandroid.suppressUnsupportedOptionWarnings=android.aapt2FromMavenOverride")
 
     if (BuildPreferences.isStacktraceEnabled) {
       extraArgs.add("--stacktrace")
@@ -479,43 +482,85 @@ class GradleBuildService :
     checkServerStarted()
     Objects.requireNonNull(params)
     return performBuildTasks(server!!.initialize(params)).thenApply { result ->
-      if (result != null) {}
+      if (result != null) {
+        buildServiceScope.launch {
+          try {
+            kotlinx.coroutines.delay(5000) // 5 seconds
+            log.info("5 seconds elapsed after initialization, stopping Gradle daemons...")
+            // stopGradleDaemons().get()
+          } catch (e: Exception) {
+            log.error("Error in post-initialization daemon cleanup", e)
+          }
+        }
+      }
       result
     }
   }
 
+  /**
+   * Stops all Gradle daemons by executing gradlew --stop
+   */
+  private fun stopGradleDaemons(): CompletableFuture<Void> {
+    return CompletableFuture.runAsync {
+      try {
+        val projectDir = ProjectManagerImpl.getInstance().projectDir
+        val gradlewPath = File(projectDir, "gradlew").absolutePath
+        
+        log.info("Stopping Gradle daemons...")
+        
+        val command = listOf("sh", gradlewPath, "--stop")
+        val processBuilder = ProcessBuilder(command)
+        processBuilder.directory(projectDir)
+        
+        // Set up environment
+        val termuxEnv = TermuxShellEnvironment().getEnvironment(this@GradleBuildService, false)
+        val customEnv = HashMap<String, String>()
+        Environment.putEnvironment(customEnv, false)
+        
+        val finalEnv = processBuilder.environment()
+        finalEnv.putAll(termuxEnv)
+        finalEnv.putAll(customEnv)
+        
+        val process = processBuilder.start()
+        val exitCode = process.waitFor()
+        
+        if (exitCode == 0) {
+          log.info("Gradle daemons stopped successfully")
+          eventListener?.onOutput("Gradle daemons stopped")
+        } else {
+          log.warn("Failed to stop Gradle daemons, exit code: $exitCode")
+        }
+      } catch (e: Exception) {
+        log.error("Error stopping Gradle daemons", e)
+      }
+    }
+  }
+  
   override fun executeTasks(vararg tasks: String): CompletableFuture<TaskExecutionResult> {
     checkServerStarted()
+    val tasksList = tasks.toList()
 
-    val moduleCount = getModuleCount()
-    log.info("Detected $moduleCount modules in project")
+    if (isDebugBuild(tasksList)) {
+      log.info("Debug build detected, injecting logger plugin")
+      injectLoggerForCurrentBuild()
+    } else {
+      log.info("Release build detected, skipping logger injection")
+      isReleaseVariant = true
+    }
 
-    // Use sh gradlew approach if more than 4 modules, otherwise use Tooling API
-    return if (moduleCount > 4) {
-      log.info("Using sh gradlew approach for multi-module project ($moduleCount modules)")
-    
-    /** @idea Mohammed-Baqer-Null @ https://github.com/Mohammed-baqer-null
+    /*
+    * @idea Mohammed-Baqer-Null @ https://github.com/Mohammed-baqer-null
     * ! THIS IS A TEMPORARY FIX ! gradually transforming acs lite compiler in here properly in v..04 or 05
+
     * - Using the local Gradle wrapper (gradlew) is significantly faster than using the Tooling API.
     * - Employing the Tooling API for compilation on Android is a poor choice this is a resource-limited Android environment, not a desktop one.
     * - The Tooling API consumes excessive JVM memory without delivering meaningful benefits.
     * - The implementation below resolves OutOfMemory exceptions seamlessly.
     */
-      executeTasksWithGradlewShell(tasks.toList())
-    } else {
-      log.info("Using Tooling API approach for project with $moduleCount modules")
-      val message = TaskExecutionMessage(tasks.toList())
-      performBuildTasks(server!!.executeTasks(message))
-    }
-  }
 
-  /** Execute tasks using sh gradlew for multi-module projects to save memory. */
-  private fun executeTasksWithGradlewShell(
-      tasks: List<String>
-  ): CompletableFuture<TaskExecutionResult> {
     return performBuildTasks(
         CompletableFuture.supplyAsync {
-          val buildInfo = BuildInfo(tasks)
+          val buildInfo = BuildInfo(tasksList)
           prepareBuild(buildInfo)
 
           try {
@@ -597,96 +642,65 @@ class GradleBuildService :
                 }
 
             if (result.isSuccessful) {
-              onBuildSuccessful(BuildResult(tasks))
+              onBuildSuccessful(BuildResult(tasksList))
             } else {
-              onBuildFailed(BuildResult(tasks))
+              onBuildFailed(BuildResult(tasksList))
             }
 
             result
           } catch (e: Exception) {
             log.error("Failed to execute gradlew with sh", e)
             val result = TaskExecutionResult(false, TaskExecutionResult.Failure.BUILD_FAILED)
-            onBuildFailed(BuildResult(tasks))
+            onBuildFailed(BuildResult(tasksList))
             result
           }
         }
     )
+    
   }
 
   /**
-   * Counts the number of modules in the current project by checking settings.gradle files. Handles
-   * various include patterns including multi-line and different quote styles.
+   * Kills any running gradlew processes forcefully
    */
-  private fun getModuleCount(): Int {
+  private fun killGradlewProcesses() {
     try {
-      val projectDir = ProjectManagerImpl.getInstance().projectDir
-      val settingsGradle = File(projectDir, "settings.gradle")
-      val settingsGradleKts = File(projectDir, "settings.gradle.kts")
-
-      val settingsFile =
-          when {
-            settingsGradle.exists() -> settingsGradle
-            settingsGradleKts.exists() -> settingsGradleKts
-            else -> return 1 // No settings file means single module
-          }
-
-      val content = settingsFile.readText()
-
-      // Remove comments to avoid false positives
-      val cleanedContent =
-          content
-              .lines()
-              .filterNot { it.trim().startsWith("//") }
-              .joinToString("\n")
-              .replace(Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL), "")
-
-      // Find all include statements and extract module names
-      val modules = mutableSetOf<String>()
-
-      // Pattern to match include statements with various formats
-      // Matches: include(...)  or include ...
-      val includePattern = Regex("""include\s*\(([^)]+)\)""", RegexOption.DOT_MATCHES_ALL)
-
-      includePattern.findAll(cleanedContent).forEach { match ->
-        val includeContent = match.groupValues[1]
-
-        // Extract all module names from the include content
-        // Matches :moduleName with either single or double quotes
-        val modulePattern = Regex("""['"]:([^'"]+)['"]""")
-
-        modulePattern.findAll(includeContent).forEach { moduleMatch ->
-          val moduleName = moduleMatch.groupValues[1].trim()
-          if (moduleName.isNotEmpty()) {
-            modules.add(moduleName)
-          }
-        }
+      log.info("Attempting to kill running gradlew processes...")
+      
+      // Use pkill to kill gradlew processes
+      val command = listOf("pkill", "-f", "gradlew")
+      val processBuilder = ProcessBuilder(command)
+      
+      val process = processBuilder.start()
+      val exitCode = process.waitFor()
+      
+      if (exitCode == 0) {
+        log.info("Gradlew processes killed successfully")
+        eventListener?.onOutput("All Gradle build processes terminated")
+      } else {
+        log.info("No gradlew processes found or already terminated")
       }
-
-      // Also handle individual include statements without parentheses grouping
-      // Pattern: include ':module' or include ":module"
-      val singleIncludePattern = Regex("""include\s+['"]:([^'"]+)['"]""")
-
-      singleIncludePattern.findAll(cleanedContent).forEach { match ->
-        val moduleName = match.groupValues[1].trim()
-        if (moduleName.isNotEmpty()) {
-          modules.add(moduleName)
-        }
-      }
-
-      val moduleCount = modules.size
-      log.info("Found ${moduleCount} modules: ${modules.joinToString(", ")}")
-
-      // Return at least 1 (root project)
-      return maxOf(1, moduleCount)
     } catch (e: Exception) {
-      log.error("Failed to count modules", e)
-      return 1 // Default to single module on error
+      log.error("Error killing gradlew processes", e)
     }
   }
 
   override fun cancelCurrentBuild(): CompletableFuture<BuildCancellationRequestResult> {
     checkServerStarted()
-    return server!!.cancelCurrentBuild()
+    
+    val cancellationFuture = server!!.cancelCurrentBuild()
+    
+    buildServiceScope.launch {
+      try {
+        kotlinx.coroutines.delay(1000) // Wait 1 second for graceful cancellation
+        log.info("Force stopping Gradle daemons after build cancellation...")
+        // stopGradleDaemons().get()
+        killGradlewProcesses()
+      } catch (e: Exception) {
+        log.error("Error during forced daemon shutdown", e)
+      }
+    }
+    
+    return cancellationFuture
   }
 
   private fun <T> performBuildTasks(future: CompletableFuture<T>): CompletableFuture<T> {

@@ -50,6 +50,7 @@ private class AIAgentConfig(
   @IgnoredOnParcel private var deepseekApiKeyPref: DeepseekApiKey? = null
   @IgnoredOnParcel private var openAIApiKeyPref: OpenAIApiKey? = null
   @IgnoredOnParcel private var anthropicApiKeyPref: AnthropicApiKey? = null
+  @IgnoredOnParcel private var grokApiKeyPref: GrokApiKey? = null
 
   init {
     val aiAgentEnabled = AIAgentEnabled { isEnabled -> updateApiKeyPreferencesState(isEnabled) }
@@ -58,12 +59,14 @@ private class AIAgentConfig(
     deepseekApiKeyPref = DeepseekApiKey()
     openAIApiKeyPref = OpenAIApiKey()
     anthropicApiKeyPref = AnthropicApiKey()
+    grokApiKeyPref = GrokApiKey()
 
     addPreference(aiAgentEnabled)
     addPreference(geminiApiKeyPref!!)
     addPreference(deepseekApiKeyPref!!)
     addPreference(openAIApiKeyPref!!)
     addPreference(anthropicApiKeyPref!!)
+    addPreference(grokApiKeyPref!!)
   }
 
   private fun updateApiKeyPreferencesState(isEnabled: Boolean) {
@@ -71,8 +74,10 @@ private class AIAgentConfig(
     deepseekApiKeyPref?.setEnabled(isEnabled)
     openAIApiKeyPref?.setEnabled(isEnabled)
     anthropicApiKeyPref?.setEnabled(isEnabled)
+    grokApiKeyPref?.setEnabled(isEnabled)
   }
 }
+
 
 @Parcelize
 private class AIAgentEnabled(
@@ -94,6 +99,61 @@ private class AIAgentEnabled(
       title = context.getString(R.string.ai_agent_enable)
       summary = context.getString(R.string.ai_agent_enable_summary)
     }
+  }
+}
+
+
+@Parcelize
+private class GrokApiKey(
+    override val key: String = "ai_agent_grok_api_key",
+    override val title: Int = R.string.ai_agent_grok_api_key,
+) : BasePreference() {
+
+  @IgnoredOnParcel private var preference: Preference? = null
+
+  override fun onCreatePreference(context: Context): Preference {
+    preference =
+        androidx.preference.Preference(context).apply {
+          key = "ai_agent_grok_api_key"
+          title = context.getString(R.string.ai_agent_grok_api_key)
+          summary = getSummaryText()
+          isEnabled = prefManager.getBoolean("ai_agent_enabled", false)
+        }
+    return preference!!
+  }
+
+  override fun onPreferenceClick(preference: Preference): Boolean {
+    val context = preference.context
+
+    val editText = android.widget.EditText(context)
+    editText.setText(prefManager.getString("ai_agent_grok_api_key", ""))
+    editText.hint = "Enter your xAI Grok API key"
+
+    val dialog =
+        com.google.android.material.dialog
+            .MaterialAlertDialogBuilder(context)
+            .setTitle("Grok API Key")
+            .setMessage("Enter your xAI Grok API key")
+            .setView(editText)
+            .setPositiveButton("Save") { _, _ ->
+              val apiKey = editText.text.toString().trim()
+              prefManager.putString("ai_agent_grok_api_key", apiKey)
+              preference.summary = getSummaryText()
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+
+    dialog.show()
+    return true
+  }
+
+  fun setEnabled(enabled: Boolean) {
+    preference?.isEnabled = enabled
+  }
+
+  private fun getSummaryText(): String {
+    val apiKey = prefManager.getString("ai_agent_grok_api_key", "")
+    return if (apiKey.isBlank()) "Click to set API key" else "API Key: ${apiKey.take(8)}..."
   }
 }
 

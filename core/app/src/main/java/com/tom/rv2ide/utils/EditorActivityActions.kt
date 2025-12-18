@@ -33,7 +33,9 @@ import com.tom.rv2ide.actions.editor.PasteAction
 import com.tom.rv2ide.actions.editor.SelectAllAction
 import com.tom.rv2ide.actions.etc.DisconnectLogSendersAction
 import com.tom.rv2ide.actions.etc.FindActionMenu
+import com.tom.rv2ide.actions.etc.ColorSchemeMenu
 import com.tom.rv2ide.actions.etc.IdeConfigurationsAction
+import com.tom.rv2ide.actions.etc.TextActionMenuAction
 import com.tom.rv2ide.actions.etc.LaunchAppAction
 import com.tom.rv2ide.actions.etc.PreviewLayoutAction
 import com.tom.rv2ide.actions.etc.ReloadColorSchemesAction
@@ -70,12 +72,16 @@ class EditorActivityActions {
       registry.registerAction(UndoAction(context, order++))
       registry.registerAction(RedoAction(context, order++))
       registry.registerAction(QuickRunWithCancellationAction(context, order++))
+      registry.registerAction(ColorSchemeMenu(context, order++))
+      
       registry.registerAction(RunTasksAction(context, order++))
+      registry.registerAction(TextActionMenuAction(context, order++))
       registry.registerAction(SaveFileAction(context, order++))
       registry.registerAction(PreviewLayoutAction(context, order++))
       registry.registerAction(FindActionMenu(context, order++))
       registry.registerAction(ProjectSyncAction(context, order++))
-      registry.registerAction(ReloadColorSchemesAction(context, order++))
+      
+      // registry.registerAction(ReloadColorSchemesAction(context, order++))
       registry.registerAction(DisconnectLogSendersAction(context, order++))
       registry.registerAction(LaunchAppAction(context, order++))
       registry.registerAction(IdeConfigurationsAction(context, order++))

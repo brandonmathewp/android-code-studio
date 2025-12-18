@@ -36,6 +36,7 @@ object EditorPreferences {
   const val PRINTABLE_CHARS = "idepref_editor_nonPrintableFlags"
   const val TAB_SIZE = "idepref_editor_tabSize"
   const val AUTO_SAVE = "idepref_editor_autoSave"
+  const val KEYBOARD_SUGGESTIONS = "idepref_editor_show_keyboard_suggestions"
   const val AUTO_SAVE_TWO = "auto_save_enabled"
   const val KEY_STRING_EXT_HELPER = "editor_stringExtHelper"
   const val FONT_LIGATURES = "idepref_editor_fontLigatures"
@@ -45,13 +46,30 @@ object EditorPreferences {
   const val USE_ICU = "idepref_editor_useIcu"
   const val USE_SOFT_TAB = "idepref_editor_useSoftTab"
   const val USE_CUSTOM_FONT = "idepref_editor_useCustomFont"
+  const val SELECTED_CUSTOM_FONT = "idepref_selected_custom_font"
+  
   const val DELETE_EMPTY_LINES = "idepref_editor_deleteEmptyLines"
   const val DELETE_TABS_ON_BACKSPACE = "idepref_editor_deleteTab"
   const val STICKY_SCROLL_ENABLED = "idepref_editor_stickyScrollEnabled"
   const val PIN_LINE_NUMBERS = "idepref_editor_pinLineNumbers"
 
   const val COLOR_SCHEME = "idepref_editor_colorScheme"
+  const val SYNTAX_ENGINE = "idepref_editor_syntaxEngine"
   const val DEFAULT_COLOR_SCHEME = "default"
+
+  enum class SyntaxEngine {
+    TREE_SITTER,
+    TEXTMATE,
+  }
+
+  var syntaxEngine: SyntaxEngine
+    get() {
+      val stored = prefManager.getString(SYNTAX_ENGINE, SyntaxEngine.TREE_SITTER.name)
+      return runCatching { SyntaxEngine.valueOf(stored) }.getOrDefault(SyntaxEngine.TREE_SITTER)
+    }
+    set(value) {
+      prefManager.putString(SYNTAX_ENGINE, value.name)
+    }
 
   var completionsMatchLower: Boolean
     get() = prefManager.getBoolean(COMPLETIONS_MATCH_LOWER, false)
@@ -119,6 +137,12 @@ object EditorPreferences {
       prefManager.putBoolean(AUTO_SAVE_TWO, value)
     }
 
+  var keyboardSuggestions: Boolean
+    get() = prefManager.getBoolean(KEYBOARD_SUGGESTIONS, true)
+    set(value) {
+      prefManager.putBoolean(KEYBOARD_SUGGESTIONS, value)
+    }
+
   var stringExtHelper: Boolean
     get() = prefManager.getBoolean(KEY_STRING_EXT_HELPER, false)
     set(value) {
@@ -159,6 +183,12 @@ object EditorPreferences {
     get() = prefManager.getBoolean(USE_CUSTOM_FONT, false)
     set(value) {
       prefManager.putBoolean(USE_CUSTOM_FONT, value)
+    }
+
+  var selectedCustomFont: String?
+    get() = prefManager.getString(SELECTED_CUSTOM_FONT, null)
+    set(value) {
+      prefManager.putString(SELECTED_CUSTOM_FONT, value)
     }
 
   var colorScheme: String

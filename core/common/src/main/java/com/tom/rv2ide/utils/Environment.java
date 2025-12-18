@@ -154,6 +154,10 @@ public final class Environment {
         env.put("PROJECTS", PROJECTS_DIR.getAbsolutePath());
         env.put("AT_ACSHOME_PROJECTS", AT_ACSHOME_PROJECTS.getAbsolutePath());
 
+        env.put("LD_LIBRARY_PATH", LIB_DIR.getAbsolutePath() + ":" + 
+                new File(JAVA_HOME, "lib").getAbsolutePath());
+        env.put("TMPDIR", TMP_DIR.getAbsolutePath());
+        
         // add user envs for non-failsafe sessions
         if (!forFailsafe) {
             // No mirror select

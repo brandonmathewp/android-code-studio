@@ -255,7 +255,7 @@ constructor(
     val fragment = pagerAdapter.getFragmentAtIndex(selectedTab)
     val isOutputFragment = fragment is ShareableOutputFragment
     
-    if (!isOutputFragment && sheetOffset > 0.5f) {
+    if (!isOutputFragment && behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
       binding.headerContainer.visibility = View.GONE
       return
     }
@@ -297,8 +297,8 @@ constructor(
     binding.bottomAction.progress.setProgressCompat(progress, true)
   }
 
-  fun appendApkLog(line: LogLine) {
-    pagerAdapter.logFragment?.appendLog(line)
+  fun appendApkLog(line: io.github.mohammedbaqernull.logger.model.LogEntry) {
+    pagerAdapter.logFragment?.appendLogToEditor(line)
   }
 
   fun appendBuildOut(str: String?) {

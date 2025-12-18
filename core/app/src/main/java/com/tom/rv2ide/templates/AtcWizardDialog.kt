@@ -127,10 +127,14 @@ class AtcWizardDialog : BottomSheetDialogFragment() {
     val sdkValues = Sdk.values()
     val minSdkDisplay = sdkValues.map { it.displayName() }.toTypedArray()
     val defIdx = sdkValues.indexOfFirst { it.api == 21 }.coerceAtLeast(0)
+    Options.OPT_MIN_SDK = sdkValues.getOrNull(defIdx)?.api ?: 21
     binding.minSdkInput.apply {
       setSimpleItems(minSdkDisplay)
       setText(minSdkDisplay[defIdx], false)
       setOnClickListener { showDropDown() }
+      setOnItemClickListener { _, _, position, _ ->
+        Options.OPT_MIN_SDK = sdkValues.getOrNull(position)?.api ?: 21
+      }
     }
 
     val nativeLangValues = arrayOf("C++", "C")
@@ -271,8 +275,8 @@ class AtcWizardDialog : BottomSheetDialogFragment() {
     val sdkValues = Sdk.values()
     val minSdkDisplay = sdkValues.map { it.displayName() }.toTypedArray()
     val selectedIdx = minSdkDisplay.indexOf(binding.minSdkInput.text?.toString()).coerceAtLeast(0)
-    val sdkApi = sdkValues.getOrNull(selectedIdx)?.api ?: 21
-
+    val sdkApi = Options.OPT_MIN_SDK ?: 21
+    
     val savePath =
         binding.saveLocationInput.text?.toString()?.trim().takeUnless { it.isNullOrBlank() }
             ?: Environment.PROJECTS_DIR.absolutePath

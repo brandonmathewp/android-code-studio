@@ -200,6 +200,7 @@ private class KotlinFormatStyle(
   }
 }
 
+/* DEPRECATED! clang lsp installation handled via terminal
 @Parcelize
 private class CCPPCategory(
     override val key: String = "lsp_ccpp_category",
@@ -225,6 +226,7 @@ private class CCPPLSP(
         serverId = "C_CPP",
         isInstalled = ::isCCppServerInstalled,
     )
+*/
 
 private fun getStatus(installed: Boolean): String = if (installed) "installed" else "not installed"
 

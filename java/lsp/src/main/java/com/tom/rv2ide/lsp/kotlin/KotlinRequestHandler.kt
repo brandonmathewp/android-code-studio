@@ -37,15 +37,15 @@ class KotlinRequestHandler(
 
   companion object {
     private val log = LoggerFactory.getLogger(KotlinRequestHandler::class.java)
-    private const val COMPLETION_TIMEOUT = 5000L
-    private const val DEBOUNCE_DELAY = 100L
+    private const val COMPLETION_TIMEOUT = 10000L
+    private const val DEBOUNCE_DELAY = 0L
   }
 
   private val completionConverter = KotlinCompletionConverter()
 
   // Track last sync time to avoid redundant syncs
   private val lastSyncTime = ConcurrentHashMap<String, Long>()
-  private val syncThrottleMs = 300L
+  private val syncThrottleMs = 0L
 
   // Debouncing for rapid typing
   private val lastCompletionRequest = AtomicLong(0)
@@ -122,107 +122,90 @@ class KotlinRequestHandler(
       }
 
   suspend fun complete(params: CompletionParams): CompletionResult = coroutineScope {
-    if (params.position.line < 0 || params.position.column < 0) {
-      return@coroutineScope CompletionResult(emptyList())
-    }
-
-    // Cancel previous completion (debouncing)
-    activeCompletionJob?.cancel()
-
-    val requestTimestamp = System.currentTimeMillis()
-    lastCompletionRequest.set(requestTimestamp)
-
-    // Debounce rapid typing
-    delay(DEBOUNCE_DELAY)
-
-    // Check if newer request came in
-    if (lastCompletionRequest.get() != requestTimestamp) {
-      return@coroutineScope CompletionResult(emptyList())
-    }
-
-    return@coroutineScope try {
-      val deferred = CompletableDeferred<CompletionResult>()
-
-      // Extract file content and prefix early
-      val fileContent = params.content?.toString() ?: ""
-      val prefix = extractPrefix(fileContent, params.position)
-
-      // Optimized document sync
-      val uri = params.file.toUri().toString()
-      val currentTime = System.currentTimeMillis()
-      val lastSync = lastSyncTime[uri] ?: 0L
-
-      // Only sync if needed
-      if (!documentManager.isDocumentOpen(uri)) {
-        withContext(Dispatchers.IO) {
-          documentManager.ensureDocumentOpen(params.file)
-          lastSyncTime[uri] = currentTime
-        }
-      } else if (currentTime - lastSync > syncThrottleMs) {
-        if (fileContent.isNotEmpty()) {
-          withContext(Dispatchers.IO) {
-            val currentVersion = documentManager.getDocumentVersion(uri)
-            val newVersion = currentVersion + 1
-            documentManager.setDocumentVersion(uri, newVersion)
-            documentManager.notifyDocumentChange(params.file, fileContent, newVersion)
-            lastSyncTime[uri] = currentTime
-          }
-          delay(30)
-        }
+      if (params.position.line < 0 || params.position.column < 0) {
+          return@coroutineScope CompletionResult(emptyList())
       }
-
-      val lspParams =
-          JsonObject().apply {
-            add("textDocument", JsonObject().apply { addProperty("uri", uri) })
-            add(
-                "position",
-                JsonObject().apply {
+  
+      activeCompletionJob?.cancel()
+  
+      val requestTimestamp = System.currentTimeMillis()
+      lastCompletionRequest.set(requestTimestamp)
+  
+      delay(50L) // Reduced from 100L
+  
+      if (lastCompletionRequest.get() != requestTimestamp) {
+          return@coroutineScope CompletionResult(emptyList())
+      }
+  
+      return@coroutineScope try {
+          val deferred = CompletableDeferred<CompletionResult>()
+  
+          val fileContent = params.content?.toString() ?: ""
+          val prefix = extractPrefix(fileContent, params.position)
+  
+          val uri = params.file.toUri().toString()
+          val currentTime = System.currentTimeMillis()
+          val lastSync = lastSyncTime[uri] ?: 0L
+  
+          // Non-blocking sync
+          if (!documentManager.isDocumentOpen(uri)) {
+              launch(Dispatchers.IO) {
+                  documentManager.ensureDocumentOpen(params.file)
+                  lastSyncTime[uri] = currentTime
+              }
+          } else if (currentTime - lastSync > 100L && fileContent.isNotEmpty()) { // Reduced from 300L
+              launch(Dispatchers.IO) {
+                  val currentVersion = documentManager.getDocumentVersion(uri)
+                  val newVersion = currentVersion + 1
+                  documentManager.setDocumentVersion(uri, newVersion)
+                  documentManager.notifyDocumentChange(params.file, fileContent, newVersion)
+                  lastSyncTime[uri] = currentTime
+              }
+          }
+  
+          val lspParams = JsonObject().apply {
+              add("textDocument", JsonObject().apply { addProperty("uri", uri) })
+              add("position", JsonObject().apply {
                   addProperty("line", params.position.line)
                   addProperty("character", params.position.column)
-                },
-            )
-            add("context", createCompletionContext(params))
+              })
+              add("context", createCompletionContext(params))
           }
-
-      // IMPORTANT: Request resolve support for auto-imports
-      processManager.sendRequest("textDocument/completion", lspParams) { result ->
-        launch {
-          try {
-            if (result == null) {
-              deferred.complete(CompletionResult(emptyList()))
-              return@launch
-            }
-
-            // Check if result is a CompletionList or array
-            val itemsArray =
-                when {
-                  result.has("items") -> result.getAsJsonArray("items")
-                  result.isJsonArray -> result.asJsonArray
-                  else -> {
-                    deferred.complete(CompletionResult(emptyList()))
-                    return@launch
+  
+          processManager.sendRequest("textDocument/completion", lspParams) { result ->
+              launch {
+                  try {
+                      if (result == null) {
+                          deferred.complete(CompletionResult(emptyList()))
+                          return@launch
+                      }
+  
+                      val itemsArray = when {
+                          result.has("items") -> result.getAsJsonArray("items")
+                          result.isJsonArray -> result.asJsonArray
+                          else -> {
+                              deferred.complete(CompletionResult(emptyList()))
+                              return@launch
+                          }
+                      }
+  
+                      val items = completionConverter.convertWithClasspathEnhancement(itemsArray, fileContent, prefix)
+  
+                      deferred.complete(CompletionResult(items))
+                  } catch (e: Exception) {
+                      KslLogs.error("Error processing completion", e)
+                      deferred.complete(CompletionResult(emptyList()))
                   }
-                }
-
-            // Use enhanced conversion with classpath and prefix
-            val items =
-                completionConverter.convertWithClasspathEnhancement(itemsArray, fileContent, prefix)
-
-            deferred.complete(CompletionResult(items))
-          } catch (e: Exception) {
-            KslLogs.error("Error processing completion", e)
-            deferred.complete(CompletionResult(emptyList()))
+              }
           }
-        }
+  
+          withTimeoutOrNull(COMPLETION_TIMEOUT) { deferred.await() } ?: CompletionResult(emptyList())
+      } catch (e: Exception) {
+          KslLogs.error("Error during completion", e)
+          CompletionResult(emptyList())
       }
-
-      withTimeoutOrNull(COMPLETION_TIMEOUT) { deferred.await() } ?: CompletionResult(emptyList())
-    } catch (e: Exception) {
-      KslLogs.error("Error during completion", e)
-      CompletionResult(emptyList())
-    }
   }
-
+  
   private fun extractPrefix(content: String, position: com.tom.rv2ide.models.Position): String {
     val lines = content.split("\n")
     if (position.line < 0 || position.line >= lines.size) return ""

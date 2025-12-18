@@ -34,8 +34,24 @@ class IDEPreferencesFragment : BasePreferenceFragment() {
   private var children: List<IPreference> = emptyList()
 
   private val serverStateListener = {
-    // Refresh the preferences when server state changes
     refreshPreferences()
+  }
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    
+    enterTransition = MaterialSharedAxis(MaterialSharedAxis.Z, true).apply {
+        duration = 600
+    }
+    returnTransition = MaterialSharedAxis(MaterialSharedAxis.Z, false).apply {
+        duration = 600
+    }
+    exitTransition = MaterialSharedAxis(MaterialSharedAxis.Z, true).apply {
+        duration = 600
+    }
+    reenterTransition = MaterialSharedAxis(MaterialSharedAxis.Z, false).apply {
+        duration = 600
+    }
   }
 
   override fun onCreateView(
@@ -43,9 +59,6 @@ class IDEPreferencesFragment : BasePreferenceFragment() {
       container: ViewGroup?,
       savedInstanceState: Bundle?,
   ): View {
-    enterTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
-    reenterTransition = MaterialSharedAxis(MaterialSharedAxis.X, false)
-    exitTransition = MaterialSharedAxis(MaterialSharedAxis.X, true)
     return super.onCreateView(inflater, container, savedInstanceState)
   }
 

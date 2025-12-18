@@ -67,7 +67,7 @@ import android.content.pm.ServiceInfo;
 public final class TermuxService extends Service implements AppShell.AppShellClient, TermuxSession.TermuxSessionClient {
 
     /** This service is only bound from inside the same process and never uses IPC. */
-    static class LocalBinder extends Binder implements Closeable {
+    public static class LocalBinder extends Binder implements Closeable {
         public TermuxService service;
 
         LocalBinder(final TermuxService service) {

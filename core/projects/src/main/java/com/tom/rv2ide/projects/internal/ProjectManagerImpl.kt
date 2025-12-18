@@ -44,6 +44,7 @@ import com.tom.rv2ide.tooling.api.models.BuildVariantInfo
 import com.tom.rv2ide.utils.DocumentUtils
 import com.tom.rv2ide.utils.flashError
 import com.tom.rv2ide.utils.withStopWatch
+import com.tom.rv2ide.utils.GradleFileParser
 import java.io.File
 import java.util.Locale
 import kotlin.io.path.extension
@@ -225,7 +226,6 @@ class ProjectManagerImpl : IProjectManager, EventReceiver {
     rootProject.getSubProjects().forEach { subproject ->
       if (subproject is AndroidModule) {
 
-        // variant names are not expected to be modified
         val variantNames =
             ImmutableList.builder<String>()
                 .addAll(subproject.variants.map { variant -> variant.name })
@@ -233,8 +233,20 @@ class ProjectManagerImpl : IProjectManager, EventReceiver {
 
         val variantName = subproject.configuredVariant?.name ?: IAndroidProject.DEFAULT_VARIANT
 
+        val moduleDir = File(projectDir, subproject.path.replace(":", File.separator))
+        val gradleInfo = GradleFileParser.parseModuleBuildGradle(moduleDir)
+
         buildVariants[subproject.path] =
-            BuildVariantInfo(subproject.path, variantNames, variantName)
+            BuildVariantInfo(
+                projectPath = subproject.path,
+                buildVariants = variantNames,
+                selectedVariant = variantName,
+                versionName = gradleInfo?.versionName,
+                versionCode = gradleInfo?.versionCode,
+                minSdk = gradleInfo?.minSdk,
+                targetSdk = gradleInfo?.targetSdk,
+                compileSdk = gradleInfo?.compileSdk
+            )
       }
     }
 

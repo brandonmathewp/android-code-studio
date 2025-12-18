@@ -144,8 +144,6 @@ class KotlinLanguageServer(private val context: Context) : ILanguageServer {
     KslLogs.info("Invalidating index cache and triggering reindex...")
     workspaceSetup?.getIndexCache()?.clearCache()
 
-    // You can trigger reindexing here if needed
-    // For now, the cache will be rebuilt on next startup
   }
 
   /** Clear all project caches (useful for maintenance) */

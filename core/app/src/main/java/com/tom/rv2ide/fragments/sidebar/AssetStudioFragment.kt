@@ -24,12 +24,12 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import com.tom.rv2ide.activities.AssetStudioActivity
+import com.tom.rv2ide.activities.ActivityM3Icons
 import com.tom.rv2ide.databinding.FragmentAssetStudioBinding
 
 /**
  * Fragment for the Asset Studio sidebar. Provides quick access to asset creation tools.
- *
- * @author Tom
+ * @author Mohammed-baqer-null @ https://github.com/Mohammed-baqer-null
  */
 class AssetStudioFragment : Fragment() {
 
@@ -75,6 +75,9 @@ class AssetStudioFragment : Fragment() {
 
       // Import image button
       importImageButton.setOnClickListener { launchAssetStudioWithAction("import_image") }
+
+      // Material icons 
+      m3IconsBtn.setOnClickListener { launchM3IconsActivity() }
     }
   }
 
@@ -95,9 +98,19 @@ class AssetStudioFragment : Fragment() {
         }
     startActivity(intent)
   }
+  
+  private fun launchM3IconsActivity() {
+    val intent =
+        Intent(requireContext(), ActivityM3Icons::class.java)
+    startActivity(intent)
+  }
 
   override fun onDestroyView() {
     super.onDestroyView()
     _binding = null
+  }
+  override fun onDestroy() {
+      super.onDestroy()
+      com.tom.rv2ide.utils.EditorSidebarActions.removeFragmentFromCache("ide.editor.sidebar.assetStudio")
   }
 }

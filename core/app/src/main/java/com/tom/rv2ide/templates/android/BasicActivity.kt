@@ -312,7 +312,7 @@ class BasicActivity : Template {
             defaultConfig(
                 DefaultConfig(
                     applicationId = packageHelper.getPackageId(),
-                    minSdk = 21,
+                    minSdk = Options.OPT_MIN_SDK,
                     targetSdk = 34,
                     versionCode = 1,
                     versionName = "1.0",

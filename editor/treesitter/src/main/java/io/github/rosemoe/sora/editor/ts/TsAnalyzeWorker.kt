@@ -17,6 +17,7 @@
 
 package io.github.rosemoe.sora.editor.ts
 
+import android.os.SystemClock
 import com.tom.rv2ide.treesitter.TSInputEdit
 import com.tom.rv2ide.treesitter.TSQueryCursor
 import com.tom.rv2ide.treesitter.TSTree
@@ -55,6 +56,8 @@ class TsAnalyzeWorker(
   companion object {
 
     private val log = LoggerFactory.getLogger(TsAnalyzeWorker::class.java)
+    private const val MIN_STYLE_UPDATE_INTERVAL_MS = 16L
+    private const val MAX_MOD_BATCH = 32
   }
 
   var stylesReceiver: StyleReceiver? = null
@@ -65,6 +68,7 @@ class TsAnalyzeWorker(
   private val analyzerScope = CoroutineScope(analyzerContext)
   private val messageChannel = LinkedBlockingQueue<Message<*>>()
   private var analyzerJob: Job? = null
+  private var lastStylesUpdateTime = 0L
 
   private var isInitialized = false
   private var isDestroyed = false
@@ -138,7 +142,7 @@ class TsAnalyzeWorker(
     try {
       when (message) {
         is Init -> doInit(message)
-        is Mod -> doMod(message)
+        is Mod -> processMods(message)
       }
     } catch (err: Throwable) {
       val langName = languageSpec.language.name
@@ -171,19 +175,33 @@ class TsAnalyzeWorker(
     isInitialized = true
   }
 
-  private fun doMod(mod: Mod) {
+  private fun processMods(initial: Mod) {
 
     check(isInitialized) { "'Init' must be the first message to TsAnalyzeWorker" }
 
-    val textMod = mod.data
-    val edit = textMod.edit
+    val mods = mutableListOf(initial)
+    while (mods.size < MAX_MOD_BATCH) {
+      val next = messageChannel.peek() ?: break
+      if (next !is Mod) {
+        break
+      }
+      messageChannel.poll()
+      mods.add(next)
+    }
 
-    val oldTree = tree!!
-    oldTree.edit(edit)
+    applyMods(mods)
+  }
 
-    document.doMod(textMod)
+  private fun applyMods(mods: List<Mod>) {
+    val workingTree = tree!!
 
-    (edit as? TreeSitterInputEdit?)?.recycle()
+    mods.forEach { mod ->
+      val textMod = mod.data
+      val edit = textMod.edit
+      workingTree.edit(edit)
+      document.doMod(textMod)
+      (edit as? TreeSitterInputEdit?)?.recycle()
+    }
 
     document.requestCancellationAndWaitIfParsing()
 
@@ -191,18 +209,21 @@ class TsAnalyzeWorker(
       return
     }
 
-    document.reparse(oldTree)
+    document.reparse(workingTree)
 
-    oldTree.close()
-    updateStyles()
+    workingTree.close()
+    updateStyles(force = true)
   }
 
-  private fun updateStyles() {
-    if (isDestroyed || messageChannel.isNotEmpty() || tree?.canAccess() != true) {
-      // analyzer stopped or
-      // more message need to be processed
+  private fun updateStyles(force: Boolean = false) {
+    val now = SystemClock.elapsedRealtime()
+    val tooSoonSinceLastUpdate = now - lastStylesUpdateTime < MIN_STYLE_UPDATE_INTERVAL_MS
+
+    if (!force && (isDestroyed || tree?.canAccess() != true || tooSoonSinceLastUpdate)) {
       return
     }
+
+    lastStylesUpdateTime = now
 
     val tree = tree!!
     val scopedVariables = TsScopedVariables(tree, text, languageSpec)

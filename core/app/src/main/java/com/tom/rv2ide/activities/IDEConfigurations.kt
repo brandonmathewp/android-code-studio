@@ -115,19 +115,12 @@ class IDEConfigurations : EdgeToEdgeIDEActivity() {
   }
 
   private fun checkAcsSystem() {
-    val status = flashInfo("Checking acs system...")
     lifecycleScope.launch(Dispatchers.IO) {
       try {
-        withContext(Dispatchers.Main) {
-          if (AcsCommandInterface.isAcsAvailable()) {
-            //flashMessage("ACS build system is ready to use", SUCCESS)
-          }
-        }
       } catch (e: TimeoutCancellationException) {
         withContext(Dispatchers.Main) { flashError("Request timed out") }
       } catch (e: Exception) {
         withContext(Dispatchers.Main) {
-          status?.dismiss()
           flashError("An error occurred: ${e.message}")
         }
         e.printStackTrace()
